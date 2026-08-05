@@ -1,0 +1,289 @@
+/**
+ * Smart quick-add parser — pure, no React Native imports.
+ *
+ * Understands a single text field, e.g.:
+ *   "Call dentist tomorrow 5pm #health @personal high"
+ *   "Pay rent on the 1st every month"
+ *   "Team sync every monday 10:30 #work"
+ *
+ * Returns a title plus structured fields. Unknown words stay in the title.
+ */
+
+import { addDays, fromISODate, parseTime, todayKey, weekdayName } from "./dates";
+import type { Priority } from "./types";
+import { parsePriority } from "./priority";
+
+export interface QuickAddResult {
+  title: string;
+  dueDate: string | null;
+  dueTime: string | null;
+  priority: Priority | null;
+  tags: string[];
+  project: string | null;
+  recurrenceRule: string | null;
+  /** whether a due date was explicitly mentioned */
+  hasDueDate: boolean;
+}
+
+const WEEKDAY_NUMS: Record<string, number> = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+};
+
+function nextWeekday(weekday: number, offsetWeeks = 0): string {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = (weekday - today.getDay() + 7) % 7 || 7; // strictly next occurrence
+  return toIso(addDays(today, diff + offsetWeeks * 7));
+}
+
+function toIso(d: Date): string {
+  return dayKeyFor(d);
+}
+
+function dayKeyFor(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Try to parse a compact date like "8/5", "8/5/2026", "aug 5", "5 aug", "2026-08-05". */
+function parseExplicitDate(token: string): string | null {
+  const t = token.toLowerCase().replace(/[.,]/g, "");
+  // 2026-08-05
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return toIso(new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  // 8/5 or 8/5/2026
+  m = t.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (m) {
+    const year = m[3] ? (Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3])) : new Date().getFullYear();
+    return toIso(new Date(year, Number(m[1]) - 1, Number(m[2])));
+  }
+  // aug 5 / 5 aug
+  const monthNames = [
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
+  ];
+  m = t.match(/^([a-z]{3})\s+(\d{1,2})$/);
+  if (m) {
+    const month = monthNames.indexOf(m[1]);
+    if (month >= 0) return toIso(new Date(new Date().getFullYear(), month, Number(m[2])));
+  }
+  m = t.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3})$/);
+  if (m) {
+    const month = monthNames.indexOf(m[2]);
+    if (month >= 0) return toIso(new Date(new Date().getFullYear(), month, Number(m[1])));
+  }
+  return null;
+}
+
+function extractTags(input: string): { rest: string; tags: string[] } {
+  const tags: string[] = [];
+  const rest = input.replace(/#([\w-]+)/g, (_m, tag: string) => {
+    tags.push(tag);
+    return " ";
+  });
+  return { rest, tags };
+}
+
+function extractProject(input: string): { rest: string; project: string | null } {
+  let project: string | null = null;
+  const rest = input.replace(/@([\w-]+)/g, (_m, proj: string) => {
+    project = proj;
+    return " ";
+  });
+  return { rest, project };
+}
+
+/** Extract a due time ("5pm", "17:30", "noon") with an optional "at". */
+function extractTime(input: string): { rest: string; time: string | null } {
+  const m = input.match(/\b(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2}|noon|midnight)\b/i);
+  if (!m) return { rest: input, time: null };
+  const parsed = parseTime(m[1]);
+  if (!parsed) return { rest: input, time: null };
+  const rest = input.replace(m[0], " ");
+  return { rest, time: parsed };
+}
+
+const RECUR_PATTERNS: { re: RegExp; label: string | null }[] = [
+  { re: /\bevery\s+(?:day)\b/i, label: "daily" },
+  { re: /\bevery\s+(?:weekday|weekdays)\b/i, label: "weekdays" },
+  { re: /\bevery\s+(?:week)\b/i, label: "weekly" },
+  { re: /\bevery\s+(?:month)\b/i, label: "monthly" },
+  { re: /\bevery\s+(\d+)\s+days?\b/i, label: null },
+  { re: /\bevery\s+(\d+)\s+weeks?\b/i, label: null },
+  { re: /\bevery\s+(\d+)\s+months?\b/i, label: null },
+  { re: /\bevery\s+(sun|mon|tue|wed|thu|fri|sat)(?:day)?\b/i, label: null },
+  { re: /\b(daily)\b/i, label: "daily" },
+  { re: /\b(weekly)\b/i, label: "weekly" },
+  { re: /\b(monthly)\b/i, label: "monthly" },
+  { re: /\b(weekdays)\b/i, label: "weekdays" },
+];
+
+function extractRecurrence(input: string): { rest: string; rule: string | null } {
+  let rule: string | null = null;
+  let rest = input;
+  for (const { re, label } of RECUR_PATTERNS) {
+    const match = rest.match(re);
+    if (match) {
+      if (label) {
+        rule = label;
+      } else if (match[1]) {
+        const n = Number(match[1]);
+        if (Number.isFinite(n)) {
+          const unit = match[0].toLowerCase().includes("day")
+            ? "days"
+            : match[0].toLowerCase().includes("week")
+              ? "weeks"
+              : "months";
+          rule = `every ${n} ${unit}`;
+        } else {
+          rule = `every ${match[1].toLowerCase()}`;
+        }
+      }
+      rest = rest.replace(match[0], " ");
+      break;
+    }
+  }
+  return { rest, rule };
+}
+
+const PRIORITY_RE = /\b(high|medium|low|urgent|minor)\b/gi;
+
+function extractPriority(input: string): { rest: string; priority: Priority | null } {
+  let priority: Priority | null = null;
+  let rest = input.replace(PRIORITY_RE, (m, word: string) => {
+    const p = parsePriority(word, null as unknown as Priority);
+    if (p) {
+      priority = p;
+      return " ";
+    }
+    return m;
+  });
+  // "!!" or "!" tokens
+  const bang = rest.match(/!{1,3}/);
+  if (bang) {
+    if (!priority) priority = bang[0].length >= 2 ? "high" : "medium";
+    rest = rest.replace(bang[0], " ");
+  }
+  return { rest, priority };
+}
+
+/** Extract a due-date mention. Run after time/tags/project. */
+function extractDate(input: string): { rest: string; date: string | null } {
+  let rest = input;
+  let date: string | null = null;
+
+  const patterns: { re: RegExp; compute: (m: RegExpMatchArray) => string | null }[] = [
+    {
+      re: /\bthe\s+day\s+after\s+tomorrow\b/i,
+      compute: () => dayKeyFor(addDays(new Date(), 2)),
+    },
+    { re: /\bday\s+after\s+tomorrow\b/i, compute: () => dayKeyFor(addDays(new Date(), 2)) },
+    { re: /\btomorrow\b/i, compute: () => dayKeyFor(addDays(new Date(), 1)) },
+    { re: /\btoday\b/i, compute: () => todayKey() },
+    { re: /\bnext\s+week\b/i, compute: () => dayKeyFor(addDays(new Date(), 7)) },
+    {
+      re: /\bnext\s+(sun|mon|tue|wed|thu|fri|sat)(?:day)?\b/i,
+      compute: (m) => nextWeekday(WEEKDAY_NUMS[m[1].toLowerCase()], 1),
+    },
+    { re: /\bin\s+(\d+)\s+days?\b/i, compute: (m) => dayKeyFor(addDays(new Date(), Number(m[1]))) },
+    { re: /\bon\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/i, compute: (m) => dayKeyFor(new Date(new Date().getFullYear(), new Date().getMonth(), Number(m[1]))) },
+    {
+      re: /\b(?:on\s+)?(sun|mon|tue|wed|thu|fri|sat)(?:day)?\b/i,
+      compute: (m) => nextWeekday(WEEKDAY_NUMS[m[1].toLowerCase()]),
+    },
+  ];
+
+  for (const { re, compute } of patterns) {
+    const m = rest.match(re);
+    if (m) {
+      date = compute(m);
+      rest = rest.replace(m[0], " ");
+      break;
+    }
+  }
+
+  // Explicit compact dates ("8/5", "aug 5") are token-level.
+  if (!date) {
+    const tokens = rest.split(/\s+/);
+    for (const token of tokens) {
+      const d = parseExplicitDate(token);
+      if (d) {
+        date = d;
+        rest = rest.replace(token, " ");
+        break;
+      }
+    }
+  }
+
+  return { rest, date };
+}
+
+/**
+ * Parse a quick-add string into structured fields.
+ */
+export function parseQuickAdd(input: string): QuickAddResult {
+  let rest = input.trim();
+  const { rest: r1, tags } = extractTags(rest);
+  rest = r1;
+  const { rest: r2, project } = extractProject(rest);
+  rest = r2;
+  const { rest: r3, time } = extractTime(rest);
+  rest = r3;
+  const { rest: r4, rule } = extractRecurrence(rest);
+  rest = r4;
+  const { rest: r5, priority } = extractPriority(rest);
+  rest = r5;
+  const { rest: r6, date } = extractDate(rest);
+  rest = r6;
+
+  const title = rest.replace(/\s+/g, " ").trim();
+  return {
+    title,
+    dueDate: date,
+    dueTime: time,
+    priority,
+    tags,
+    project,
+    recurrenceRule: rule,
+    hasDueDate: date !== null,
+  };
+}
+
+/** Convenience: format a parsed result for preview text. */
+export function describeParsed(r: QuickAddResult): string {
+  const bits: string[] = [];
+  if (r.dueDate) {
+    const d = fromISODate(r.dueDate);
+    bits.push(r.dueTime ? `${weekdayName(d, "short")} ${r.dueTime}` : weekdayName(d, "short"));
+  }
+  if (r.priority) bits.push(r.priority);
+  for (const t of r.tags) bits.push(`#${t}`);
+  if (r.project) bits.push(`@${r.project}`);
+  if (r.recurrenceRule) bits.push("repeats");
+  return bits.join(" · ");
+}
