@@ -22,6 +22,19 @@ export const REMINDER_PREF_KEY = "daymark.notifications.enabled";
 
 export const isReminderSupported = Platform.OS === "ios" || Platform.OS === "android";
 
+// Without a handler, expo-notifications silently drops notifications while the
+// app is in the foreground. Banner/list + sound keeps due reminders visible.
+if (isReminderSupported) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
+
 /** Create the Android channel + shared category once. Safe to call repeatedly. */
 export async function ensureReminderSetup(): Promise<void> {
   if (!isReminderSupported) return;
