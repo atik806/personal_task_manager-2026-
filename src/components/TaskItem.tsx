@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../hooks/use-theme";
 import { formatTimeHHMM, isBeforeToday, todayKey } from "../lib/dates";
@@ -50,9 +50,9 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
   return (
     <Animated.View
       style={{
-        opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.45] }),
+        opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
         transform: [
-          { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) },
+          { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) },
         ],
       }}
     >
@@ -60,9 +60,12 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`${task.title}${task.due_time ? ` at ${formatTimeHHMM(task.due_time)}` : ""}`}
-        style={({ pressed }) => [
+        style={({ pressed, hovered }) => [
           styles.row,
-          pressed ? { backgroundColor: colors.accentSoft } : null,
+          done ? { backgroundColor: colors.successSoft } : null,
+          (pressed || (Platform.OS === "web" && hovered)) && !done
+            ? { backgroundColor: colors.hover }
+            : null,
         ]}
       >
         <SpineNode kind={taskSpineKind(task)} />
@@ -75,6 +78,7 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
                 color: colors.ink,
                 fontFamily: fonts.bodyMedium,
                 textDecorationLine: done ? "line-through" : "none",
+                opacity: done ? 0.7 : 1,
               },
             ]}
           >
@@ -82,9 +86,12 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
           </Text>
           <View style={styles.metaRow}>
             {showTime && task.due_time ? (
-              <Text style={[styles.meta, { color: colors.inkSecondary, fontFamily: fonts.mono }]}>
-                {formatTimeHHMM(task.due_time)}
-              </Text>
+              <View style={[styles.timeChip, { backgroundColor: colors.chipBg }]}>
+                <Feather name="clock" size={10} color={colors.inkSecondary} />
+                <Text style={[styles.timeText, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
+                  {formatTimeHHMM(task.due_time)}
+                </Text>
+              </View>
             ) : null}
             {overdue && showOverdueLabel ? (
               <View style={[styles.badge, { backgroundColor: colors.dangerSoft }]}>
@@ -116,7 +123,9 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
               </Text>
             ) : null}
             {task.recurrence_rule ? (
-              <Feather name="repeat" size={12} color={colors.inkSecondary} />
+              <View style={[styles.repeatChip, { backgroundColor: colors.chipBg }]}>
+                <Feather name="repeat" size={11} color={colors.inkSecondary} />
+              </View>
             ) : null}
           </View>
         </View>
@@ -137,12 +146,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 56,
     paddingRight: 12,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   content: {
     flex: 1,
     paddingVertical: 10,
-    gap: 3,
+    gap: 4,
   },
   title: {
     fontSize: 15,
@@ -157,6 +166,24 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: 12,
+  },
+  timeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  timeText: {
+    fontSize: 11,
+  },
+  repeatChip: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
   badge: {
     flexDirection: "row",

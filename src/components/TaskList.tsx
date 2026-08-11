@@ -65,12 +65,15 @@ export function TaskList({
       {sections.map(({ slot, tasks: sectionTasks }) => (
         <View key={slot} style={styles.section}>
           <View style={styles.sectionHeader}>
+            <View style={[styles.sectionDot, { backgroundColor: colors.accent }]} />
             <Text style={[styles.sectionTitle, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
               {slotLabel(slot)}
             </Text>
-            <Text style={[styles.sectionCount, { color: colors.inkSecondary, fontFamily: fonts.mono }]}>
-              {sectionTasks.length}
-            </Text>
+            <View style={[styles.sectionCountChip, { backgroundColor: colors.chipBg }]}>
+              <Text style={[styles.sectionCount, { color: colors.inkSecondary, fontFamily: fonts.mono }]}>
+                {sectionTasks.length}
+              </Text>
+            </View>
           </View>
           {sectionTasks.map((task) => (
             <TaskItem
@@ -99,15 +102,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingTop: 16,
-    paddingBottom: 4,
+    paddingBottom: 6,
     paddingLeft: 2,
+  },
+  sectionDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
   sectionTitle: {
     fontSize: 11,
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
+  sectionCountChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 999,
+  },
   sectionCount: {
-    fontSize: 11,
+    fontSize: 10,
   },
 });
