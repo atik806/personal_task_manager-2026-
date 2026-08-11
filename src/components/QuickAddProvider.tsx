@@ -3,7 +3,7 @@ import { Platform, Pressable, StyleSheet } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../hooks/use-theme";
 import { useAuth } from "../hooks/use-auth";
-import { ensureTag } from "../lib/supabase";
+import { ensureTag, insertProject, supabase } from "../lib/supabase";
 import { useSaveTask } from "../lib/query";
 import type { TaskInsert } from "../lib/types";
 import type { QuickAddResult } from "../lib/parse";
@@ -32,10 +32,32 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           // individual tag failures don't block the task
         }
       }
+
+      let projectId: string | null = null;
+      if (result.project) {
+        try {
+          // Resolve project by name (case-insensitive), create if not exists
+          const { data: existing } = await supabase
+            .from("projects")
+            .select("id")
+            .eq("user_id", user.id)
+            .ilike("name", result.project)
+            .maybeSingle();
+          if (existing) {
+            projectId = existing.id;
+          } else {
+            const created = await insertProject({ name: result.project, color: "#6366f1", archived: false });
+            projectId = created.id;
+          }
+        } catch {
+          // project resolution/creation failures don't block the task
+        }
+      }
+
       const input: TaskInsert = {
         title: result.title,
         description: "",
-        project_id: null,
+        project_id: projectId,
         due_date: result.dueDate,
         due_time: result.dueTime,
         priority: result.priority ?? "medium",
