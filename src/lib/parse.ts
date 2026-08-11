@@ -42,11 +42,29 @@ const WEEKDAY_NUMS: Record<string, number> = {
   sat: 6,
 };
 
+/**
+ * Compute the date for a weekday.
+ * - offsetWeeks = 0: strictly next occurrence (e.g., "monday" on Monday → next Monday = +7)
+ * - offsetWeeks > 0: the target day in the next calendar week, treating today
+ *   as the start of the current week (e.g., "next monday" on Monday → +7,
+ *   on Tuesday → +6, on Sunday → +1).
+ */
 function nextWeekday(weekday: number, offsetWeeks = 0): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = (weekday - today.getDay() + 7) % 7 || 7; // strictly next occurrence
-  return toIso(addDays(today, diff + offsetWeeks * 7));
+  const todayDay = today.getDay();
+
+  if (offsetWeeks > 0) {
+    // Days until the target weekday, counting from today's week.
+    let diff = (weekday - todayDay + 7) % 7;
+    // If today IS the target weekday, we mean next week's, not today.
+    if (diff === 0) diff = 7;
+    return toIso(addDays(today, diff + (offsetWeeks - 1) * 7));
+  } else {
+    // Plain "monday" - strictly next occurrence
+    const diff = (weekday - todayDay + 7) % 7 || 7;
+    return toIso(addDays(today, diff));
+  }
 }
 
 function toIso(d: Date): string {
@@ -205,13 +223,66 @@ function extractDate(input: string): { rest: string; date: string | null } {
     { re: /\bday\s+after\s+tomorrow\b/i, compute: () => dayKeyFor(addDays(new Date(), 2)) },
     { re: /\btomorrow\b/i, compute: () => dayKeyFor(addDays(new Date(), 1)) },
     { re: /\btoday\b/i, compute: () => todayKey() },
-    { re: /\bnext\s+week\b/i, compute: () => dayKeyFor(addDays(new Date(), 7)) },
+    // "next week" → next Monday (start of next week)
+    {
+      re: /\bnext\s+week\b/i,
+      compute: () => nextWeekday(WEEKDAY_NUMS.monday, 1),
+    },
     {
       re: /\bnext\s+(sun|mon|tue|wed|thu|fri|sat)(?:day)?\b/i,
       compute: (m) => nextWeekday(WEEKDAY_NUMS[m[1].toLowerCase()], 1),
     },
     { re: /\bin\s+(\d+)\s+days?\b/i, compute: (m) => dayKeyFor(addDays(new Date(), Number(m[1]))) },
-    { re: /\bon\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/i, compute: (m) => dayKeyFor(new Date(new Date().getFullYear(), new Date().getMonth(), Number(m[1]))) },
+    // "on the 5th" or "on 1st" - ordinal or with "the"
+    {
+      re: /\bon\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/i,
+      compute: (m) => {
+        const day = Number(m[1]);
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        // Create a date for this month with the given day
+        let candidate = new Date(year, month, day);
+        // If invalid day (e.g., Feb 31), clamp to last day of month
+        if (candidate.getMonth() !== month) {
+          candidate = new Date(year, month + 1, 0); // last day of current month
+        }
+        // If the date is in the past (≤ today), roll to next month
+        const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (candidate <= todayDate) {
+          // Next month
+          const nextMonth = new Date(year, month + 1, day);
+          if (nextMonth.getMonth() !== (month + 1) % 12) {
+            nextMonth.setDate(0); // clamp to last day of next month
+          }
+          candidate = nextMonth;
+        }
+        return dayKeyFor(candidate);
+      },
+    },
+    // "on the N" (without ordinal) - only when "the" is present
+    {
+      re: /\bon\s+the\s+(\d{1,2})\b/i,
+      compute: (m) => {
+        const day = Number(m[1]);
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        let candidate = new Date(year, month, day);
+        if (candidate.getMonth() !== month) {
+          candidate = new Date(year, month + 1, 0);
+        }
+        const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (candidate <= todayDate) {
+          const nextMonth = new Date(year, month + 1, day);
+          if (nextMonth.getMonth() !== (month + 1) % 12) {
+            nextMonth.setDate(0);
+          }
+          candidate = nextMonth;
+        }
+        return dayKeyFor(candidate);
+      },
+    },
     {
       re: /\b(?:on\s+)?(sun|mon|tue|wed|thu|fri|sat)(?:day)?\b/i,
       compute: (m) => nextWeekday(WEEKDAY_NUMS[m[1].toLowerCase()]),
