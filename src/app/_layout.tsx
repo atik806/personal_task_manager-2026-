@@ -8,8 +8,8 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } f
 import { JetBrainsMono_400Regular, JetBrainsMono_500Medium } from "@expo-google-fonts/jetbrains-mono";
 
 import "@/global.css";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "../lib/query-client";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { QUERY_CACHE_BUSTER, queryClient, queryPersister } from "../lib/query-client";
 import { ThemeProvider, useTheme } from "../hooks/use-theme";
 import { AuthProvider } from "../hooks/use-auth";
 
@@ -53,12 +53,15 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: queryPersister, maxAge: 1000 * 60 * 60 * 24, buster: QUERY_CACHE_BUSTER }}
+    >
       <ThemeProvider>
         <AuthProvider>
           <RootNavigator />
         </AuthProvider>
       </ThemeProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

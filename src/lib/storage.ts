@@ -13,13 +13,15 @@ async function getItem(key: string): Promise<string | null> {
   if (isWeb) {
     try {
       return window.localStorage.getItem(key);
-    } catch {
+    } catch (e) {
+      console.warn(`[storage] getItem failed (web): ${key}`, e);
       return null;
     }
   }
   try {
     return await SecureStore.getItemAsync(key);
-  } catch {
+  } catch (e) {
+    console.warn(`[storage] getItem failed (native): ${key}`, e);
     return null;
   }
 }
@@ -28,15 +30,18 @@ async function setItem(key: string, value: string): Promise<void> {
   if (isWeb) {
     try {
       window.localStorage.setItem(key, value);
-    } catch {
-      // storage full / private mode — ignore
+    } catch (e) {
+      // storage full / private mode — surface instead of failing silently
+      console.warn(`[storage] setItem failed (web): ${key}`, e);
     }
     return;
   }
   try {
     await SecureStore.setItemAsync(key, value);
-  } catch {
-    // ignore
+  } catch (e) {
+    // A failed write here can silently drop the auth session (SecureStore has
+    // size limits on some iOS releases), so it must not be invisible.
+    console.warn(`[storage] setItem failed (native): ${key}`, e);
   }
 }
 
@@ -44,15 +49,15 @@ async function removeItem(key: string): Promise<void> {
   if (isWeb) {
     try {
       window.localStorage.removeItem(key);
-    } catch {
-      // ignore
+    } catch (e) {
+      console.warn(`[storage] removeItem failed (web): ${key}`, e);
     }
     return;
   }
   try {
     await SecureStore.deleteItemAsync(key);
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn(`[storage] removeItem failed (native): ${key}`, e);
   }
 }
 
