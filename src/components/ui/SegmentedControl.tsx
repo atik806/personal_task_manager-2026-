@@ -1,5 +1,5 @@
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../hooks/use-theme";
 import { fonts } from "../../lib/theme";
 
@@ -14,15 +14,49 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
 }: SegmentedControlProps<T>) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  const count = options.length;
+
+  const [thumb] = useState(() => new Animated.Value(index));
+  const reducedMotion = useRef(false);
+
+  useEffect(() => {
+    AccessibilityInfo.isReduceMotionEnabled().then((v) => (reducedMotion.current = v));
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion.current) {
+      thumb.setValue(index);
+    } else {
+      Animated.spring(thumb, {
+        toValue: index,
+        speed: 22,
+        bounciness: 8,
+        useNativeDriver: false,
+      }).start();
+    }
+  }, [index, thumb]);
+
+  const thumbLeft = thumb.interpolate({
+    inputRange: [0, count - 1],
+    outputRange: Array.from({ length: count }, (_, i) => `${(i * 100) / count}%`),
+  });
+
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: isDark ? "#14161C" : "#ECEEF5", borderColor: colors.line },
+        { backgroundColor: colors.trackBg, borderColor: colors.line },
       ]}
       accessibilityRole="tablist"
     >
+      <Animated.View
+        style={[
+          styles.thumb,
+          { width: `${100 / count}%`, left: thumbLeft, backgroundColor: colors.thumbBg, shadowColor: colors.shadowColor },
+        ]}
+      />
       {options.map((opt) => {
         const active = opt.value === value;
         return (
@@ -31,9 +65,10 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(opt.value)}
-            style={[styles.item, active ? { backgroundColor: colors.surface, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1 } : null]}
+            style={({ pressed }) => [styles.item, pressed ? { opacity: 0.8 } : null]}
           >
             <Text
+              numberOfLines={1}
               style={{
                 fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
                 fontSize: 13,
@@ -56,6 +91,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 3,
   },
+  thumb: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    borderRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
   item: {
     flex: 1,
     minHeight: 32,
@@ -63,5 +108,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,
+    zIndex: 1,
   },
 });

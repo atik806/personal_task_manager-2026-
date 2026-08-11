@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Text, TextInput, View, type TextInputProps, type TextStyle, type ViewStyle } from "react-native";
 import { useTheme } from "../../hooks/use-theme";
 import { fonts } from "../../lib/theme";
@@ -13,7 +13,8 @@ interface TextFieldProps extends Omit<TextInputProps, "style"> {
 }
 
 export function TextField({ label, error, hint, inputStyle, style, ...inputProps }: TextFieldProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
 
   return (
     <View style={[{ gap: 6 }, style]}>
@@ -29,18 +30,29 @@ export function TextField({ label, error, hint, inputStyle, style, ...inputProps
         </Text>
       ) : null}
       <TextInput
-        placeholderTextColor={isDark ? "#5A5F6E" : "#9BA0B0"}
+        placeholderTextColor={colors.inkMuted}
         selectionColor={colors.accent}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         style={{
           minHeight: 44,
           borderRadius: 10,
           borderWidth: 1,
-          borderColor: error ? colors.danger : colors.line,
-          backgroundColor: isDark ? "#14161C" : "#F6F7FB",
+          borderColor: error ? colors.danger : focused ? colors.accent : colors.line,
+          backgroundColor: colors.fieldBg,
           paddingHorizontal: 12,
           color: colors.ink,
           fontFamily: fonts.body,
           fontSize: 15,
+          ...(focused && !error
+            ? {
+                shadowColor: colors.accent,
+                shadowOpacity: 0.18,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 0 },
+                elevation: 2,
+              }
+            : {}),
           ...inputStyle,
         }}
         {...inputProps}
