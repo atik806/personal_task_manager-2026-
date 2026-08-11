@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
-import { fonts, radius } from "../../lib/theme";
+import { elevation, fonts, radius } from "../../lib/theme";
 
 const WEB_BREAKPOINT = 1024;
 
@@ -27,13 +27,15 @@ interface SheetProps {
 
 /**
  * Overlay panel. On web ≥1024px it slides in from the right as a detail
- * panel; on narrow/mobile it becomes a bottom sheet. 180ms ease-out.
+ * panel; on narrow/mobile it becomes a bottom sheet. 180ms ease-out,
+ * backdrop fades in with the panel. Respects reduced motion.
  */
 export function Sheet({ open, onClose, title, subtitle, children, showCloseButton = true }: SheetProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const isWide = Platform.OS === "web" && Dimensions.get("window").width >= WEB_BREAKPOINT;
 
   const [translate] = useState(() => new Animated.Value(isWide ? 420 : 600));
+  const [backdrop] = useState(() => new Animated.Value(0));
   const reducedMotion = useRef(false);
 
   useEffect(() => {
@@ -42,15 +44,14 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
 
   useEffect(() => {
     if (open) {
-      Animated.timing(translate, {
-        toValue: 0,
-        duration: reducedMotion.current ? 0 : 180,
-        useNativeDriver: true,
-      }).start();
+      const duration = reducedMotion.current ? 0 : 180;
+      Animated.timing(translate, { toValue: 0, duration, useNativeDriver: true }).start();
+      Animated.timing(backdrop, { toValue: 1, duration, useNativeDriver: true }).start();
     } else {
       translate.setValue(isWide ? 420 : 600);
+      backdrop.setValue(0);
     }
-  }, [open, translate, isWide]);
+  }, [open, translate, backdrop, isWide]);
 
   if (!open) return null;
 
@@ -58,10 +59,14 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim, opacity: backdrop }]}
+      />
       <Pressable
         accessibilityLabel="Close panel"
         onPress={onClose}
-        style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? "rgba(0,0,0,0.55)" : "rgba(20,22,28,0.32)" }]}
+        style={StyleSheet.absoluteFill}
       />
       <Animated.View
         pointerEvents="box-none"
@@ -70,10 +75,11 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
           isWide ? { width: panelWidth } : null,
           { transform: [{ translateY: isWide ? 0 : translate }, { translateX: isWide ? translate : 0 }] },
           { backgroundColor: colors.surface, borderColor: colors.line },
+          isWide ? { ...elevation(colors, "lg") } : null,
         ]}
       >
         <View style={styles.grabberContainer}>
-          <View style={[styles.grabber, { backgroundColor: colors.line }]} />
+          <View style={[styles.grabber, { backgroundColor: colors.lineStrong }]} />
         </View>
         {(title || subtitle || showCloseButton) && (
           <View style={styles.header}>
@@ -93,7 +99,7 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Close"
-                style={[styles.closeBtn, { borderColor: colors.line }]}
+                style={({ pressed }) => [styles.closeBtn, { borderColor: colors.line }, pressed ? { backgroundColor: colors.hover } : null]}
               >
                 <Feather name="x" size={18} color={colors.inkSecondary} />
               </Pressable>
@@ -117,11 +123,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radius.xl,
     paddingTop: 20,
     paddingHorizontal: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    shadowOffset: { width: -4, height: 0 },
-    elevation: 12,
   },
   panelBottom: {
     position: "absolute",

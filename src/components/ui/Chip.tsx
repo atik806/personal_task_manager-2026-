@@ -13,37 +13,40 @@ interface ChipProps {
 }
 
 export function Chip({ label, color, onPress, selected, dot = true }: ChipProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+
+  const chipStyle = selected
+    ? {
+        backgroundColor: colors.accentSoft,
+        borderColor: colors.accent,
+      }
+    : {
+        backgroundColor: colors.chipBg,
+        borderColor: colors.line,
+      };
+
+  const labelStyle = selected
+    ? { color: colors.accent, fontFamily: fonts.bodySemiBold }
+    : { color: colors.inkSecondary, fontFamily: fonts.bodyMedium };
+
   const content = (
-    <View
-      style={[
-        styles.chip,
-        {
-          backgroundColor: selected ? colors.accent : isDark ? "#232836" : "#F0F1F7",
-          borderColor: selected ? colors.accent : colors.line,
-        },
-      ]}
-    >
+    <View style={[styles.chip, chipStyle]}>
       {dot && color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
-      <Text
-        numberOfLines={1}
-        style={[
-          styles.label,
-          { color: selected ? colors.onAccent : colors.inkSecondary, fontFamily: fonts.bodyMedium },
-        ]}
-      >
+      <Text numberOfLines={1} style={[styles.label, labelStyle]}>
         {label}
       </Text>
     </View>
   );
 
   if (!onPress) return content;
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
+      accessibilityState={{ selected: !!selected }}
+      style={({ pressed }) => [pressed ? { opacity: 0.7 } : null, styles.wrap]}
     >
       {content}
     </Pressable>
@@ -51,6 +54,9 @@ export function Chip({ label, color, onPress, selected, dot = true }: ChipProps)
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    borderRadius: 999,
+  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
