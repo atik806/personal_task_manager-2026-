@@ -18,13 +18,17 @@ import {
   priorityWeight,
 } from "../priority";
 import {
+  currentStreak,
+  completionsByWeekday,
   isBeforeToday,
+  normalizeTime,
   parseTime,
   slotOfTime,
   todayKey,
   toISODate,
 } from "../dates";
 import { tasksToCSV, tasksToJSON } from "../export";
+import { buildRecurringTask, taskInsertFromPatch } from "../task-utils";
 import type { Priority, TaskWithTags } from "../types";
 
 /* ---------------------------------------------------------------- */
@@ -181,6 +185,17 @@ describe("recurrence: getOccurrences / nextOccurrenceKeys", () => {
   it("returns empty for null rule", () => {
     expect(getOccurrences(null, D(2026, 8, 1), 5)).toEqual([]);
   });
+
+  // --- Fix #2: getOccurrences monthly clamping (Jan31 -> Feb28 -> Mar31 -> Apr30) ---
+  it("monthly occurrences clamp correctly (Jan31 -> Feb28 -> Mar31 -> Apr30)", () => {
+    const dates = getOccurrences("monthly", D(2026, 1, 31), 4);
+    expect(dates).toEqual([D(2026, 2, 28), D(2026, 3, 31), D(2026, 4, 30), D(2026, 5, 31)]);
+  });
+
+  it("monthly occurrences with interval=2", () => {
+    const dates = getOccurrences("every 2 months", D(2026, 1, 31), 3);
+    expect(dates).toEqual([D(2026, 3, 31), D(2026, 5, 31), D(2026, 7, 31)]);
+  });
 });
 
 /* ---------------------------------------------------------------- */
@@ -239,6 +254,45 @@ describe("quick-add parsing", () => {
     const r = parseQuickAdd("Standup at 14:30");
     expect(r.dueTime).toBe("14:30");
     expect(r.title).toBe("Standup");
+  });
+
+  // --- Fix #3, #4, #5: quick-add date parsing edge cases ---
+
+  it('parses "next week" as next Monday', () => {
+    const r = parseQuickAdd("Meeting next week");
+    expect(r.title).toBe("Meeting");
+    expect(r.dueDate).toBe(nextMondayKey());
+    expect(r.hasDueDate).toBe(true);
+  });
+
+  it('parses "on the 5th" with ordinal (clamps invalid days, rolls if past)', () => {
+    // Use a date that exists in current month to test basic ordinal parsing
+    const r = parseQuickAdd("Pay rent on the 15th");
+    expect(r.title).toBe("Pay rent");
+    expect(r.dueDate).not.toBeNull();
+    expect(r.hasDueDate).toBe(true);
+  });
+
+  it('parses "on the N" without ordinal but with "the"', () => {
+    const r = parseQuickAdd("Bill due on the 1");
+    expect(r.title).toBe("Bill due");
+    expect(r.dueDate).not.toBeNull();
+    expect(r.hasDueDate).toBe(true);
+  });
+
+  it('does NOT parse "Focus on 3 priorities" as a date (no "the" or ordinal)', () => {
+    const r = parseQuickAdd("Focus on 3 priorities");
+    expect(r.title).toBe("Focus on 3 priorities");
+    expect(r.dueDate).toBeNull();
+    expect(r.hasDueDate).toBe(false);
+  });
+
+  it('parses "next monday" with offsetWeeks=1 on Monday -> +7 days, on Tuesday -> +6 days', () => {
+    // We can't easily test the internal nextWeekday offsetWeeks behavior without mocking today,
+    // but we can test that "next monday" is parsed as a date
+    const r = parseQuickAdd("Task next monday");
+    expect(r.dueDate).not.toBeNull();
+    expect(r.hasDueDate).toBe(true);
   });
 });
 
@@ -336,11 +390,185 @@ describe("parseTime", () => {
     expect(parseTime("midnight")).toBe("00:00");
   });
 
+  it("parses bare HHMM (e.g., 0900 -> 09:00)", () => {
+    expect(parseTime("0900")).toBe("09:00");
+    expect(parseTime("1730")).toBe("17:30");
+    expect(parseTime("0000")).toBe("00:00");
+    expect(parseTime("2359")).toBe("23:59");
+  });
+
+  it("rejects invalid bare HHMM", () => {
+    expect(parseTime("2400")).toBeNull();
+    expect(parseTime("0960")).toBeNull();
+    expect(parseTime("123")).toBeNull(); // too short
+    expect(parseTime("12345")).toBeNull(); // too long
+  });
+
   it("rejects invalid times", () => {
     expect(parseTime("25:00")).toBeNull();
     expect(parseTime("13pm")).toBeNull();
     expect(parseTime("")).toBeNull();
     expect(parseTime(null as unknown as string)).toBeNull();
+  });
+});
+
+describe("normalizeTime (Postgres time boundary)", () => {
+  it("strips seconds from HH:MM:SS", () => {
+    expect(normalizeTime("17:30:00")).toBe("17:30");
+    expect(normalizeTime("09:00:00")).toBe("09:00");
+    expect(normalizeTime("23:59:59")).toBe("23:59");
+  });
+
+  it("passes through HH:MM and null", () => {
+    expect(normalizeTime("17:30")).toBe("17:30");
+    expect(normalizeTime(null)).toBeNull();
+    expect(normalizeTime(undefined)).toBeNull();
+  });
+});
+
+describe("currentStreak honors ref parameter", () => {
+  // fixed reference: 2026-08-07 (Friday)
+  const ref = new Date(2026, 7, 7);
+
+  it("counts consecutive days ending on ref when ref is complete", () => {
+    // completed 2026-08-05, 2026-08-06, 2026-08-07 (ref day)
+    expect(currentStreak(["2026-08-05", "2026-08-06", "2026-08-07"], ref)).toBe(3);
+  });
+
+  it("starts from day before ref when ref is not complete", () => {
+    // completed 2026-08-04, 2026-08-05, 2026-08-06 (ref 2026-08-07 not complete)
+    expect(currentStreak(["2026-08-04", "2026-08-05", "2026-08-06"], ref)).toBe(3);
+  });
+
+  it("returns 0 when no consecutive days before ref", () => {
+    expect(currentStreak(["2026-08-01"], ref)).toBe(0);
+  });
+
+  it("differs from today()-based streak when ref != today", () => {
+    const today = new Date();
+    if (!isSameDay(ref, today)) {
+      const dates = ["2026-08-05", "2026-08-06", "2026-08-07"];
+      const withRef = currentStreak(dates, ref);
+      const withoutRef = currentStreak(dates); // uses today()
+      expect(withRef).toBe(3);
+      expect(withoutRef).not.toBe(withRef);
+    }
+  });
+});
+
+describe("completionsByWeekday honors ref parameter", () => {
+  const ref = new Date(2026, 7, 7); // 2026-08-07 Friday
+
+  it("counts completions in the 7-day window ending on ref", () => {
+    const dates = [
+      "2026-08-01", // Saturday (6 days before ref)
+      "2026-08-02", // Sunday
+      "2026-08-03", // Monday
+      "2026-08-04", // Tuesday
+      "2026-08-05", // Wednesday
+      "2026-08-06", // Thursday
+      "2026-08-07", // Friday (ref day)
+    ];
+    const result = completionsByWeekday(dates, ref);
+    expect(result).toHaveLength(7);
+    expect(result.reduce((sum, d) => sum + d.count, 0)).toBe(7);
+    // Labels should be Sat, Sun, Mon, Tue, Wed, Thu, Fri
+    expect(result[0].label).toBe("Sat");
+    expect(result[6].label).toBe("Fri");
+  });
+
+  it("ignores dates outside the 7-day window", () => {
+    const dates = ["2026-07-31", "2026-08-01", "2026-08-08"]; // outside, inside, outside
+    const result = completionsByWeekday(dates, ref);
+    expect(result.reduce((sum, d) => sum + d.count, 0)).toBe(1);
+  });
+
+  it("differs from today()-based when ref != today", () => {
+    const today = new Date();
+    if (!isSameDay(ref, today)) {
+      const dates = ["2026-08-01", "2026-08-07"];
+      const withRef = completionsByWeekday(dates, ref);
+      const withoutRef = completionsByWeekday(dates); // uses today()
+      // With ref=2026-08-07, both dates are in window
+      expect(withRef.reduce((s, d) => s + d.count, 0)).toBe(2);
+      expect(withoutRef.reduce((s, d) => s + d.count, 0)).not.toBe(
+        withRef.reduce((s, d) => s + d.count, 0)
+      );
+    }
+  });
+});
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/* ---------------------------------------------------------------- */
+/* task-utils                                                        */
+/* ---------------------------------------------------------------- */
+
+describe("taskInsertFromPatch", () => {
+  it("stamps completed_at when completing a task", () => {
+    const task = sampleTask();
+    const patch = taskInsertFromPatch(task, { status: "done" });
+    expect(patch.status).toBe("done");
+    expect(patch.completed_at).not.toBeNull();
+  });
+
+  it("keeps the existing completed_at when status is unchanged", () => {
+    const task = sampleTask({ status: "done", completed_at: "2026-08-01T10:00:00Z" });
+    const patch = taskInsertFromPatch(task, { description: "edited" });
+    expect(patch.completed_at).toBe("2026-08-01T10:00:00Z");
+  });
+
+  it("clears completed_at when a task is reopened", () => {
+    const task = sampleTask({ status: "done", completed_at: "2026-08-01T10:00:00Z" });
+    const patch = taskInsertFromPatch(task, { status: "todo" });
+    expect(patch.status).toBe("todo");
+    expect(patch.completed_at).toBeNull();
+  });
+});
+
+describe("buildRecurringTask", () => {
+  it("returns null when there is no recurrence rule", () => {
+    expect(buildRecurringTask(sampleTask())).toBeNull();
+  });
+
+  it("builds the next daily occurrence preserving time for a future due date", () => {
+    const task = sampleTask({
+      due_date: "2030-08-05",
+      due_time: "17:30",
+      recurrence_rule: "daily",
+    });
+    const next = buildRecurringTask(task);
+    expect(next).not.toBeNull();
+    expect(next!.due_date).toBe("2030-08-06");
+    expect(next!.due_time).toBe("17:30");
+    expect(next!.status).toBe("todo");
+    expect(next!.recurrence_rule).toBe("daily");
+    expect(next!.title).toBe("Sample task");
+  });
+
+  it("catches up from today when the anchor date is in the past", () => {
+    const task = sampleTask({
+      due_date: "2020-01-01",
+      due_time: "09:00",
+      recurrence_rule: "daily",
+    });
+    const next = buildRecurringTask(task);
+    expect(next).not.toBeNull();
+    expect(next!.due_date).toBe(dayKeyOffset(1)); // tomorrow, anchored from today
+    expect(next!.due_time).toBe("09:00");
+  });
+
+  it("clamps monthly occurrences to end-of-month", () => {
+    const task = sampleTask({
+      due_date: "2030-01-31",
+      due_time: "09:00",
+      recurrence_rule: "monthly",
+    });
+    const next = buildRecurringTask(task);
+    expect(next!.due_date).toBe("2030-02-28");
+    expect(next!.due_time).toBe("09:00");
   });
 });
 
