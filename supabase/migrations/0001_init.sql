@@ -1,9 +1,9 @@
--- Daymark — initial schema.
--- Deploy with: supabase db push
---
--- Every table is user-scoped (user_id) with RLS restricted to the owner,
--- a BEFORE INSERT trigger that stamps user_id from auth.uid(), and an
--- updated_at trigger on the mutable tables.
+-- Daymark — consolidated single migration.
+-- Replaces the former 0001_init.sql + 0002_fixes.sql + 0003_rls_hardening.sql.
+-- Apply via Supabase Dashboard → SQL Editor (or `supabase db push`).
+-- Safe to re-run: every statement is idempotent.
+
+begin;
 
 create extension if not exists pgcrypto;
 
@@ -11,7 +11,7 @@ create extension if not exists pgcrypto;
 /* Tables                                                              */
 /* ------------------------------------------------------------------ */
 
-create table public.projects (
+create table if not exists public.projects (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
@@ -21,7 +21,7 @@ create table public.projects (
   updated_at timestamptz not null default now()
 );
 
-create table public.tasks (
+create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   title text not null,
@@ -41,7 +41,7 @@ create table public.tasks (
   updated_at timestamptz not null default now()
 );
 
-create table public.tags (
+create table if not exists public.tags (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   name text not null,
@@ -50,13 +50,13 @@ create table public.tags (
   unique (user_id, name)
 );
 
-create table public.task_tags (
+create table if not exists public.task_tags (
   task_id uuid not null references public.tasks (id) on delete cascade,
   tag_id uuid not null references public.tags (id) on delete cascade,
   primary key (task_id, tag_id)
 );
 
-create table public.attachments (
+create table if not exists public.attachments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   task_id uuid not null references public.tasks (id) on delete cascade,
@@ -68,17 +68,29 @@ create table public.attachments (
 );
 
 /* ------------------------------------------------------------------ */
-/* Triggers                                                            */
+/* Functions & triggers                                                */
 /* ------------------------------------------------------------------ */
 
+-- Stamps user_id from the session JWT (security invoker: RLS already
+-- guarantees the caller is the row owner).
 create or replace function public.set_user_id()
 returns trigger
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 begin
   new.user_id := auth.uid();
+  return new;
+end $$;
+
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at := now();
   return new;
 end $$;
 
@@ -101,16 +113,6 @@ drop trigger if exists trg_set_user_id_attachments on public.attachments;
 create trigger trg_set_user_id_attachments
   before insert on public.attachments
   for each row execute function public.set_user_id();
-
-create or replace function public.touch_updated_at()
-returns trigger
-language plpgsql
-set search_path = public
-as $$
-begin
-  new.updated_at := now();
-  return new;
-end $$;
 
 drop trigger if exists trg_touch_updated_at_projects on public.projects;
 create trigger trg_touch_updated_at_projects
@@ -137,38 +139,73 @@ alter table public.tags enable row level security;
 alter table public.task_tags enable row level security;
 alter table public.attachments enable row level security;
 
+-- Hardened ownership policies: scoped to authenticated so anon requests
+-- short-circuit, and auth.uid() wrapped in (select …) to evaluate once
+-- per query instead of once per row.
+
+drop policy if exists "own projects" on public.projects;
 create policy "own projects" on public.projects
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
+drop policy if exists "own tasks" on public.tasks;
 create policy "own tasks" on public.tasks
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
+drop policy if exists "own tags" on public.tags;
 create policy "own tags" on public.tags
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
+drop policy if exists "own attachments" on public.attachments;
 create policy "own attachments" on public.attachments
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+  for all to authenticated
+  using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 -- task_tags links are only visible/manageable through the user's own tasks
 -- and tags (no public join table).
+drop policy if exists "own task_tags" on public.task_tags;
 create policy "own task_tags" on public.task_tags
-  for all
+  for all to authenticated
   using (
     exists (
       select 1 from public.tasks t
-      where t.id = task_id and t.user_id = auth.uid()
+      where t.id = task_id and t.user_id = (select auth.uid())
     )
   )
   with check (
     exists (
       select 1 from public.tasks t
-      where t.id = task_id and t.user_id = auth.uid()
+      where t.id = task_id and t.user_id = (select auth.uid())
     )
     and exists (
       select 1 from public.tags g
-      where g.id = tag_id and g.user_id = auth.uid()
+      where g.id = tag_id and g.user_id = (select auth.uid())
     )
   );
+
+/* ------------------------------------------------------------------ */
+/* Helper functions                                                    */
+/* ------------------------------------------------------------------ */
+
+-- Atomically replace a task's tags in a single transaction.
+create or replace function public.replace_task_tags(
+  p_task_id uuid,
+  p_tag_ids uuid[]
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  delete from public.task_tags where task_id = p_task_id;
+
+  if p_tag_ids is not null and array_length(p_tag_ids, 1) > 0 then
+    insert into public.task_tags (task_id, tag_id)
+    select p_task_id, unnest(p_tag_ids);
+  end if;
+end $$;
 
 /* ------------------------------------------------------------------ */
 /* Indexes                                                             */
@@ -182,3 +219,9 @@ create index if not exists tasks_project_id_idx on public.tasks (project_id);
 create index if not exists tasks_parent_id_idx on public.tasks (parent_task_id);
 create index if not exists tags_user_id_idx on public.tags (user_id);
 create index if not exists attachments_task_id_idx on public.attachments (task_id);
+create index if not exists task_tags_tag_id_idx on public.task_tags (tag_id);
+
+commit;
+
+-- Reload PostgREST schema cache so the REST API sees the new tables now.
+notify pgrst, 'reload schema';
