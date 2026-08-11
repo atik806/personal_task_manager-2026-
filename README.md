@@ -83,32 +83,32 @@ npx expo export --platform web
 
 ```
 src/
-  app/            expo-router routes (auth + (app) group: today, upcoming,
-                  overdue, calendar, dashboard, projects, tags, search,
-                  settings)
-  components/     DaySpine, TaskRow, TaskDetailSheet, QuickAddSheet, ui/*
-  hooks/          theme hook
-  lib/            pure logic — NO react-native imports here
-    dates.ts        date math + formatting
+  app/            expo-router routes (auth screens + (app) group: today,
+                  upcoming, calendar, projects, tags, search, settings)
+  components/     DaySpine, TaskItem, TaskDetailSheet, QuickAddSheet, ui/*
+  hooks/          use-theme, use-auth
+  lib/            pure logic — no react-native imports, except the explicit
+                  platform boundary (storage.ts, notifications.ts, supabase.ts)
+    dates.ts        date math + formatting + streaks
     recurrence.ts   parse "every N days/weeks/…" + next occurrence
     parse.ts        quick-add smart parsing ("buy milk #groceries tmrw")
     priority.ts     priority ordering + labels
-    task-utils.ts   grouping/sorting helpers
+    task-utils.ts   task patch/recurrence helpers
     export.ts       CSV/JSON export (RFC 4180 escaping)
     notifications.ts  local reminder scheduling + notification actions
-    supabase.ts     typed client + data access (insert/update/delete)
+    supabase.ts     typed client + data access (insert/update/delete) + auth calls
     query.ts        TanStack Query hooks (offlineFirst)
     storage.ts      key-value store (SecureStore native / localStorage web)
-    auth.ts         auth client + storage adapter
     theme.ts        design tokens, fonts, light/dark palettes
-  types/          shared TypeScript types
+    types.ts        shared TypeScript types
 supabase/
-  migrations/     0001_init.sql
+  migrations/     0001_init.sql, 0002_fixes.sql, 0003_rls_hardening.sql
   functions/      generate-recurring, dispatch-reminders (optional stubs)
 ```
 
-Pure logic lives in `src/lib` with **zero** React Native imports, so it is
-unit-testable and web-safe.
+Pure logic lives in `src/lib` with **zero** React Native imports (except the
+three files that are the platform boundary), so it is unit-testable and
+web-safe.
 
 ---
 
