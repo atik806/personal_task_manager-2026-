@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   StyleSheet,
   Text,
   type ViewStyle,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../hooks/use-theme";
-import { MIN_TOUCH } from "../../lib/theme";
+import { elevation, MIN_TOUCH } from "../../lib/theme";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -32,60 +34,77 @@ export function Button({
   style,
   accessibilityLabel,
 }: ButtonProps) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const [scale] = useState(() => new Animated.Value(1));
 
-  const bg =
-    variant === "primary"
-      ? colors.accent
-      : variant === "danger"
-        ? colors.danger
-        : variant === "secondary"
-          ? isDark
-            ? "#2A2F3E"
-            : "#EDEFF6"
-          : "transparent";
+  const animate = (to: number) => {
+    Animated.spring(scale, {
+      toValue: to,
+      speed: 40,
+      bounciness: 6,
+      useNativeDriver: true,
+    }).start();
+  };
 
+  const isSolid = variant === "primary" || variant === "danger";
   const fg =
-    variant === "primary"
-      ? colors.onAccent
-      : variant === "danger"
-        ? "#FFFFFF"
-        : colors.ink;
+    variant === "primary" || variant === "danger"
+      ? variant === "primary"
+        ? colors.onAccent
+        : "#FFFFFF"
+      : colors.ink;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: disabled || loading }}
-      disabled={disabled || loading}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.base,
-        { backgroundColor: bg, borderColor: variant === "ghost" ? colors.line : "transparent" },
-        pressed && !disabled ? { opacity: 0.82 } : null,
-        disabled || loading ? { opacity: 0.5 } : null,
-        style,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color={fg} />
-      ) : (
-        <React.Fragment>
-          {icon}
-          <Text
-            style={[
-              styles.label,
-              {
-                color: fg,
-                fontFamily: variant === "primary" || variant === "danger" ? "Inter_600SemiBold" : "Inter_500Medium",
-              },
-            ]}
-          >
-            {label}
-          </Text>
-        </React.Fragment>
-      )}
-    </Pressable>
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? label}
+        accessibilityState={{ disabled: disabled || loading }}
+        disabled={disabled || loading}
+        onPress={onPress}
+        onPressIn={() => animate(0.96)}
+        onPressOut={() => animate(1)}
+        style={({ pressed }) => [
+          styles.base,
+          variant === "ghost" ? { borderColor: colors.line } : null,
+          variant === "secondary" ? { backgroundColor: colors.buttonSecondaryBg, borderColor: "transparent" } : null,
+          variant === "danger" ? { backgroundColor: colors.danger, borderColor: "transparent" } : null,
+          !isSolid && pressed ? { backgroundColor: colors.hover } : null,
+          disabled || loading ? { opacity: 0.5 } : null,
+          variant === "primary"
+            ? { ...elevation(colors, "sm"), shadowOpacity: disabled ? 0 : 0.16 }
+            : null,
+          { minHeight: MIN_TOUCH },
+        ]}
+      >
+        {variant === "primary" ? (
+          <LinearGradient
+            colors={colors.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        {loading ? (
+          <ActivityIndicator size="small" color={fg} />
+        ) : (
+          <React.Fragment>
+            {icon}
+            <Text
+              style={[
+                styles.label,
+                {
+                  color: fg,
+                  fontFamily: isSolid ? "Inter_600SemiBold" : "Inter_500Medium",
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          </React.Fragment>
+        )}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -100,6 +119,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     borderWidth: 1,
+    borderColor: "transparent",
+    overflow: "hidden",
   },
   label: {
     fontSize: 15,
