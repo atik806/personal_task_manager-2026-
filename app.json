@@ -21,7 +21,6 @@
       },
       "package": "com.daymark.app",
       "predictiveBackGestureEnabled": false,
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "SCHEDULE_EXACT_ALARM"
       ]
