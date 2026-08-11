@@ -149,7 +149,7 @@ export function formatTimeHHMM(time: string): string {
 
 /**
  * Parse a time string into 24h "HH:MM".
- * Accepts "17:30", "5pm", "5:30pm", "noon", "midnight", "0900".
+ * Accepts "17:30", "17:30:00", "5pm", "5:30pm", "noon", "midnight", "0900" (bare HHMM).
  * Returns null when unparseable.
  */
 export function parseTime(input: string): string | null {
@@ -158,18 +158,39 @@ export function parseTime(input: string): string | null {
   if (!s) return null;
   if (s === "noon") return "12:00";
   if (s === "midnight") return "00:00";
-  const m = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
+  // Accept bare 4-digit HHMM (e.g., "0900" -> "09:00")
+  if (/^\d{4}$/.test(s)) {
+    const h = Number(s.slice(0, 2));
+    const min = Number(s.slice(2, 4));
+    if (h >= 0 && h <= 23 && min >= 0 && min <= 59) {
+      return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+    return null;
+  }
+  const m = s.match(/^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/);
   if (!m) return null;
   let h = Number(m[1]);
   const min = m[2] ? Number(m[2]) : 0;
-  const period = m[3];
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  const sec = m[3] ? Number(m[3]) : 0;
+  const period = m[4];
+  if (h < 0 || h > 23 || min < 0 || min > 59 || sec < 0 || sec > 59) return null;
   if (period) {
     if (h < 1 || h > 12) return null;
     if (period === "pm" && h !== 12) h += 12;
     if (period === "am" && h === 12) h = 0;
   }
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/**
+ * Normalize a `time` value to "HH:MM". Postgres serializes `time` columns as
+ * "HH:MM:SS"; the app's UI and logic only understand "HH:MM". Returns null
+ * when unparseable.
+ */
+export function normalizeTime(time: string | null | undefined): string | null {
+  if (time == null) return null;
+  const parsed = parseTime(time);
+  return parsed;
 }
 
 /**
@@ -263,11 +284,11 @@ export function formatReminderOffset(offsetMinutes: number): string {
   return h % 1 === 0 ? `${h} hr before` : `${offsetMinutes} min before`;
 }
 
-/** Number of completed days in a row ending today (or the reference day). */
+/** Number of completed days in a row ending on `ref` (default: today). */
 export function currentStreak(completedDates: string[], ref: Date = new Date()): number {
   const set = new Set(completedDates);
-  let cursor = today();
-  // If today isn't complete yet, start from yesterday.
+  let cursor = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  // If the reference day isn't complete yet, start from the day before.
   if (!set.has(toISODate(cursor))) cursor = addDays(cursor, -1);
   let streak = 0;
   while (set.has(toISODate(cursor))) {
@@ -277,12 +298,12 @@ export function currentStreak(completedDates: string[], ref: Date = new Date()):
   return streak;
 }
 
-/** Number of tasks completed within the last 7 days, per weekday, for the dashboard chart. */
+/** Number of tasks completed within the 7 days ending on `ref`, per weekday, for the dashboard chart. */
 export function completionsByWeekday(
   completedAtDates: string[],
   ref: Date = new Date()
 ): { label: string; count: number }[] {
-  const end = today();
+  const end = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
   const start = addDays(end, -6);
   const counts = new Map<string, number>();
   for (let i = 0; i < 7; i++) {

@@ -219,6 +219,37 @@ export function getOccurrences(
 ): Date[] {
   const out: Date[] = [];
   if (!rule) return out;
+
+  const parsed = parseRecurrenceRule(rule);
+  if (!parsed) return out;
+
+  // For monthly rules, advance from the ORIGINAL anchor day to avoid drift
+  // and overflow (e.g., Jan 31 → Feb 28 → Mar 31 → Apr 30, not Jan 31 →
+  // Mar 3 → …). Each occurrence's month is computed directly from the
+  // anchor's year/month, so clamping to a short month never shifts the chain.
+  if (parsed.freq === "monthly") {
+    const anchorDay = from.getDate();
+    const anchorTime = {
+      hours: from.getHours(),
+      minutes: from.getMinutes(),
+      seconds: from.getSeconds(),
+      milliseconds: from.getMilliseconds(),
+    };
+
+    for (let i = 0; i < count; i++) {
+      const monthIndex = from.getMonth() + parsed.interval * (i + 1);
+      const year = from.getFullYear() + Math.floor(monthIndex / 12);
+      const month = monthIndex % 12;
+      const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+      const effectiveDay = Math.min(anchorDay, lastDayOfMonth);
+      out.push(
+        new Date(year, month, effectiveDay, anchorTime.hours, anchorTime.minutes, anchorTime.seconds, anchorTime.milliseconds)
+      );
+    }
+    return out;
+  }
+
+  // Daily/weekly: use the existing cursor-based approach
   let cursor = from;
   for (let i = 0; i < count; i++) {
     const next = computeNextOccurrence(rule, cursor);
