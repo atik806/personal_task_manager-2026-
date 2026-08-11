@@ -45,7 +45,14 @@ export function BottomTabBar() {
                 pressed ? { opacity: 0.7 } : null,
               ]}
             >
-              <Feather name={tab.icon} size={20} color={active ? colors.accent : colors.inkSecondary} />
+              <View
+                style={[
+                  styles.pill,
+                  active ? { backgroundColor: colors.accentSoft } : null,
+                ]}
+              >
+                <Feather name={tab.icon} size={19} color={active ? colors.accent : colors.inkSecondary} />
+              </View>
               <Text
                 style={{
                   fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
@@ -75,5 +82,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 3,
     minHeight: 52,
+  },
+  pill: {
+    minWidth: 48,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
 });

@@ -2,6 +2,7 @@ import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { Link, usePathname, type Href } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../hooks/use-theme";
 import { useAuth } from "../hooks/use-auth";
 import { fonts } from "../lib/theme";
@@ -30,14 +31,22 @@ function NavItem({ href, label, icon, active, collapsed }: NavItemProps) {
       <Pressable
         accessibilityRole="link"
         accessibilityState={{ selected: active }}
-        style={({ pressed }) => [
+        style={({ pressed, hovered }) => [
           styles.navItem,
           collapsed ? styles.navItemCollapsed : null,
-          active ? { backgroundColor: colors.accentSoft } : null,
-          pressed ? { opacity: 0.7 } : null,
+          (Platform.OS === "web" && hovered) && !active ? { backgroundColor: colors.hover } : null,
+          pressed ? { opacity: 0.8 } : null,
         ]}
       >
-        <Feather name={icon} size={18} color={active ? colors.accent : colors.inkSecondary} />
+        {active ? (
+          <LinearGradient
+            colors={colors.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.activePill}
+          />
+        ) : null}
+        <Feather name={icon} size={18} color={active ? colors.onAccent : colors.inkSecondary} />
         {!collapsed ? (
           <Text
             numberOfLines={1}
@@ -45,13 +54,12 @@ function NavItem({ href, label, icon, active, collapsed }: NavItemProps) {
               flex: 1,
               fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
               fontSize: 14,
-              color: active ? colors.ink : colors.inkSecondary,
+              color: active ? colors.onAccent : colors.inkSecondary,
             }}
           >
             {label}
           </Text>
         ) : null}
-        {active && !collapsed ? <View style={[styles.activeBar, { backgroundColor: colors.accent }]} /> : null}
       </Pressable>
     </Link>
   );
@@ -82,9 +90,14 @@ export function Sidebar() {
       ]}
     >
       <View style={styles.brandRow}>
-        <View style={[styles.logo, { backgroundColor: colors.accent }]}>
+        <LinearGradient
+          colors={colors.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.logo, { shadowColor: colors.accent }]}
+        >
           <Feather name="sun" size={16} color={colors.onAccent} />
-        </View>
+        </LinearGradient>
         {!collapsed ? (
           <Text style={[styles.brand, { color: colors.ink, fontFamily: fonts.displayBold }]}>Daymark</Text>
         ) : null}
@@ -96,10 +109,15 @@ export function Sidebar() {
         style={({ pressed }) => [
           styles.newTaskBtn,
           collapsed ? styles.newTaskBtnCollapsed : null,
-          { backgroundColor: colors.accent },
           pressed ? { opacity: 0.85 } : null,
         ]}
       >
+        <LinearGradient
+          colors={colors.gradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={StyleSheet.absoluteFill}
+        />
         <Feather name="plus" size={18} color={colors.onAccent} />
         {!collapsed ? (
           <Text style={[styles.newTaskText, { color: colors.onAccent, fontFamily: fonts.bodySemiBold }]}>
@@ -125,7 +143,7 @@ export function Sidebar() {
 
       <NavItem href={"/settings"} label="Settings" icon="settings" active={pathname === "/settings"} collapsed={collapsed} />
 
-      <View style={[styles.footer, collapsed ? styles.footerCollapsed : null]}>
+      <View style={[styles.footer, { borderTopColor: colors.line }, collapsed ? styles.footerCollapsed : null]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isDark ? "Switch to light theme" : "Switch to dark theme"}
@@ -176,6 +194,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 3,
   },
   brand: {
     fontSize: 20,
@@ -188,6 +210,12 @@ const styles = StyleSheet.create({
     gap: 8,
     minHeight: 44,
     borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: "#4C5FD5",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   newTaskBtnCollapsed: {
     width: 44,
@@ -204,22 +232,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     minHeight: 44,
-    borderRadius: 10,
-    paddingHorizontal: 10,
+    borderRadius: 12,
+    paddingHorizontal: 12,
     position: "relative",
+    overflow: "hidden",
   },
   navItemCollapsed: {
     justifyContent: "center",
     paddingHorizontal: 0,
   },
-  activeBar: {
+  activePill: {
     position: "absolute",
+    top: 0,
+    left: 0,
     right: 0,
-    top: 10,
-    bottom: 10,
-    width: 3,
-    borderTopLeftRadius: 2,
-    borderBottomLeftRadius: 2,
+    bottom: 0,
   },
   spacer: {
     flex: 1,
@@ -230,7 +257,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: "transparent",
   },
   footerCollapsed: {
     justifyContent: "center",
