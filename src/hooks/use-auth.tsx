@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import * as Notifications from "expo-notifications";
 import { onAuthChange, signOut as supabaseSignOut, supabase } from "../lib/supabase";
+import { isReminderSupported } from "../lib/notifications";
 
 interface AuthContextValue {
   session: Session | null;
@@ -45,6 +47,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabaseSignOut();
     setSession(null);
+    // Don't keep firing reminders for a signed-out user's tasks.
+    if (isReminderSupported) {
+      Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});
+    }
   };
 
   return (

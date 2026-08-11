@@ -1,15 +1,39 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { Link } from "expo-router";
+import * as Linking from "expo-linking";
 import { useTheme } from "../hooks/use-theme";
-import { resetPassword, updatePassword } from "../lib/supabase";
+import { useAuth } from "../hooks/use-auth";
+import { resetPassword, updatePassword, supabase } from "../lib/supabase";
 import { fonts } from "../lib/theme";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/TextField";
 
+interface RecoveryTokens {
+  access_token: string;
+  refresh_token: string;
+}
+
+/** Parse a Supabase recovery link ("#access_token=…&refresh_token=…&type=recovery"). */
+function parseRecoveryUrl(url: string): RecoveryTokens | null {
+  if (!url) return null;
+  const hash = url.includes("#") ? url.split("#")[1] : "";
+  const fields = Object.fromEntries(
+    hash.split("&").map((pair) => {
+      const eq = pair.indexOf("=");
+      return eq === -1 ? [pair, ""] : [pair.slice(0, eq), decodeURIComponent(pair.slice(eq + 1))];
+    })
+  );
+  if (fields.access_token && fields.refresh_token) {
+    return { access_token: fields.access_token, refresh_token: fields.refresh_token };
+  }
+  return null;
+}
+
 export default function ResetPasswordScreen() {
   const { colors } = useTheme();
+  const { session } = useAuth();
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -17,6 +41,33 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [updated, setUpdated] = useState(false);
+
+  // When the user taps the recovery link, the app opens with an access token
+  // in the URL. Restore that session so updatePassword() has one to use.
+  useEffect(() => {
+    let active = true;
+    const handleUrl = async (url: string | null) => {
+      if (!url) return;
+      const tokens = parseRecoveryUrl(url);
+      if (!tokens) return;
+      try {
+        const { error } = await supabase.auth.setSession(tokens);
+        if (error) throw error;
+      } catch (e) {
+        if (active) {
+          setError(e instanceof Error ? e.message : "Failed to restore your reset session.");
+        }
+      }
+    };
+    Linking.getInitialURL().then(handleUrl).catch(() => {});
+    const sub = Linking.addEventListener("url", ({ url }) => handleUrl(url));
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+
+  const choosePassword = Boolean(session);
 
   const handleSend = async () => {
     setError(null);
@@ -56,15 +107,14 @@ export default function ResetPasswordScreen() {
     }
   };
 
-  if (sent) {
+  if (sent && !choosePassword) {
     return (
       <AuthLayout>
         <Text style={[styles.title, { color: colors.ink, fontFamily: fonts.displayBold }]}>Check your inbox</Text>
         <Text style={{ fontFamily: fonts.body, fontSize: 14, color: colors.inkSecondary, lineHeight: 20 }}>
           If an account exists for {email.trim().toLowerCase()}, a reset link is on its way. Open it on this device to
-          be signed in, then choose a new password below.
+          be signed in, then choose a new password.
         </Text>
-        <Button label="Choose a new password" onPress={() => setSent(false)} variant="secondary" />
         <Link href="/login" style={[styles.link, { color: colors.inkSecondary }]}>
           Back to sign in
         </Link>
@@ -85,35 +135,49 @@ export default function ResetPasswordScreen() {
 
   return (
     <AuthLayout>
-      <Text style={[styles.title, { color: colors.ink, fontFamily: fonts.displayBold }]}>Reset password</Text>
-      <TextField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-      />
-      <TextField
-        label="New password"
-        value={newPassword}
-        onChangeText={setNewPassword}
-        placeholder="6+ characters"
-        secureTextEntry
-        autoComplete="new-password"
-      />
-      <TextField
-        label="Confirm new password"
-        value={confirm}
-        onChangeText={setConfirm}
-        placeholder="Repeat password"
-        secureTextEntry
-        autoComplete="new-password"
-        onSubmitEditing={handleUpdate}
-      />
+      <Text style={[styles.title, { color: colors.ink, fontFamily: fonts.displayBold }]}>
+        {choosePassword ? "Choose a new password" : "Reset password"}
+      </Text>
+
+      {!choosePassword ? (
+        <TextField
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+        />
+      ) : (
+        <>
+          <TextField
+            label="New password"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholder="6+ characters"
+            secureTextEntry
+            autoComplete="new-password"
+          />
+          <TextField
+            label="Confirm new password"
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="Repeat password"
+            secureTextEntry
+            autoComplete="new-password"
+            onSubmitEditing={handleUpdate}
+          />
+        </>
+      )}
+
       {error ? <Text style={{ fontFamily: fonts.body, fontSize: 13, color: colors.danger }}>{error}</Text> : null}
-      <Button label="Send reset link" onPress={handleSend} loading={loading} />
+
+      <Button
+        label={choosePassword ? "Update password" : "Send reset link"}
+        onPress={choosePassword ? handleUpdate : handleSend}
+        loading={loading}
+      />
       <Link href="/login" style={[styles.link, { color: colors.inkSecondary }]}>
         Back to sign in
       </Link>
