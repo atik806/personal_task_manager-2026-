@@ -1,10 +1,11 @@
 // Daymark — generate-recurring (server-side companion for recurrence).
 //
-// The client already computes the next occurrence when a recurring task is
-// completed (src/lib/recurrence.ts). This Edge Function is the optional
-// server-side companion that catches stragglers — e.g. a recurring task that
-// was never completed, or a device that was offline at completion time — and
-// materializes the next occurrence rows.
+// The client now generates the next occurrence when a recurring task is
+// completed (src/lib/task-utils.ts → buildRecurringTask, called from
+// toggleTaskCompleted in src/lib/supabase.ts). This Edge Function is the
+// optional server-side companion that catches stragglers — e.g. a recurring
+// task that was never completed, or a device that was offline at completion
+// time — and materializes the next occurrence rows.
 //
 // Deploy:    supabase functions deploy generate-recurring
 // Schedule:  via Supabase Cron (dashboard → Edge Functions → Schedules), run

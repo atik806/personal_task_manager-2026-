@@ -23,6 +23,8 @@ import type {
   TaskUpdate,
   TaskWithTags,
 } from "./types";
+import { buildRecurringTask } from "./task-utils";
+import { normalizeTime } from "./dates";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -37,7 +39,10 @@ export const supabase: SupabaseClient = createClient(
       storage: authStorage,
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false,
+      // On web this lets supabase-js restore a password-recovery session from
+      // the URL hash automatically. On native it's a no-op (no window), where
+      // the reset screen handles the deep link explicitly via expo-linking.
+      detectSessionInUrl: true,
     },
   }
 );
@@ -53,6 +58,9 @@ interface TaskSelectRow extends TaskRow {
 function toTaskWithTags(row: TaskSelectRow): TaskWithTags {
   return {
     ...row,
+    // Postgres serializes `time` as "HH:MM:SS"; normalize once at the boundary
+    // so the rest of the app only ever sees "HH:MM".
+    due_time: normalizeTime(row.due_time),
     tags: (row.task_tags ?? [])
       .map((tt) => tt.tags)
       .filter((t): t is TagRow => t != null),
@@ -90,18 +98,13 @@ export async function updateTask(
 ): Promise<void> {
   const { error } = await supabase.from("tasks").update(patch).eq("id", id);
   if (error) throw error;
-  if (tagIds) {
-    const { error: delError } = await supabase
-      .from("task_tags")
-      .delete()
-      .eq("task_id", id);
-    if (delError) throw delError;
-    if (tagIds.length) {
-      const { error: linkError } = await supabase.from("task_tags").insert(
-        tagIds.map((tag_id) => ({ task_id: id, tag_id }))
-      );
-      if (linkError) throw linkError;
-    }
+  if (tagIds !== undefined) {
+    // Use atomic RPC to replace tags (avoids non-transactional delete-then-insert)
+    const { error: rpcError } = await supabase.rpc("replace_task_tags", {
+      p_task_id: id,
+      p_tag_ids: tagIds,
+    });
+    if (rpcError) throw rpcError;
   }
 }
 
@@ -116,6 +119,20 @@ export async function toggleTaskCompleted(task: TaskRow): Promise<void> {
     status: completing ? "done" : "todo",
     completed_at: completing ? new Date().toISOString() : null,
   });
+
+  // If completing a recurring task, generate the next occurrence
+  if (completing && task.recurrence_rule) {
+    const nextTask = buildRecurringTask(task);
+    if (nextTask) {
+      // We need to get the tag IDs from the completed task to copy them
+      const { data: taskTags } = await supabase
+        .from("task_tags")
+        .select("tag_id")
+        .eq("task_id", task.id);
+      const tagIds = (taskTags ?? []).map((tt) => tt.tag_id);
+      await insertTask(nextTask, tagIds);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ */
