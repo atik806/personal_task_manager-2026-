@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../hooks/use-theme";
 import { fonts } from "../lib/theme";
 import { getMonthGrid, getWeekDates, toISODate, today } from "../lib/dates";
@@ -16,10 +16,12 @@ interface CalendarGridProps {
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-function taskDots(tasks: TaskWithTags[]): { color: string; done: boolean }[] {
+function taskDots(
+  tasks: TaskWithTags[],
+  colors: { success: string; danger: string; accent: string }
+): { color: string }[] {
   return tasks.slice(0, 3).map((t) => ({
-    color: t.status === "done" ? "#34B27B" : t.priority === "high" ? "#FF6B5B" : "#4C5FD5",
-    done: t.status === "done",
+    color: t.status === "done" ? colors.success : t.priority === "high" ? colors.danger : colors.accent,
   }));
 }
 
@@ -27,29 +29,43 @@ function DayCell({
   date,
   tasks,
   isToday,
+  dimmed,
   onPressTask,
 }: {
   date: Date;
   tasks: TaskWithTags[];
   isToday: boolean;
+  dimmed?: boolean;
   onPressTask: (task: TaskWithTags) => void;
 }) {
   const { colors } = useTheme();
-  const dots = taskDots(tasks);
+  const dots = taskDots(tasks, colors);
   return (
-    <View style={[styles.cell, { borderColor: colors.line }]}>
+    <View
+      style={[
+        styles.cell,
+        { borderColor: colors.line },
+        dimmed ? { opacity: 0.45 } : null,
+      ]}
+    >
       <View style={styles.cellTop}>
         <View
           style={[
             styles.dayNum,
-            isToday ? { backgroundColor: colors.accent } : null,
+            isToday
+              ? {
+                  backgroundColor: colors.accentSoft,
+                  borderColor: colors.accent,
+                  borderWidth: 1.5,
+                }
+              : null,
           ]}
         >
           <Text
             style={{
               fontFamily: fonts.monoMedium,
               fontSize: 13,
-              color: isToday ? colors.onAccent : colors.ink,
+              color: isToday ? colors.accent : colors.ink,
             }}
           >
             {date.getDate()}
@@ -64,7 +80,11 @@ function DayCell({
             accessibilityLabel={tasks[i]?.title ?? "Task"}
             onPress={() => onPressTask(tasks[i])}
             hitSlop={6}
-            style={({ pressed }) => [styles.taskDot, { backgroundColor: dot.color }, pressed ? { opacity: 0.5 } : null]}
+            style={({ pressed }) => [
+              styles.taskDot,
+              { backgroundColor: dot.color },
+              pressed ? { transform: [{ scale: 0.8 }] } : null,
+            ]}
           />
         ))}
       </View>
@@ -79,48 +99,39 @@ export function CalendarGrid({ mode, anchor, tasksByDate, onPressTask }: Calenda
   const { colors } = useTheme();
   const todayKey = toISODate(today());
   const monthGrid = getMonthGrid(anchor);
+  const monthKey = toISODate(anchor).slice(0, 7);
+
+  const renderCell = (d: Date, inMonth: boolean) => {
+    const key = toISODate(d);
+    return (
+      <DayCell
+        key={key}
+        date={d}
+        tasks={tasksByDate[key] ?? []}
+        isToday={key === todayKey}
+        dimmed={!inMonth}
+        onPressTask={onPressTask}
+      />
+    );
+  };
 
   return (
     <View>
+      <View style={styles.weekHeader}>
+        {WEEKDAY_LABELS.map((label) => (
+          <Text key={label} style={[styles.weekdayLabel, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
+            {label}
+          </Text>
+        ))}
+      </View>
       {mode === "week" ? (
-        <View>
-          <View style={styles.weekHeader}>
-            {WEEKDAY_LABELS.map((label) => (
-              <Text key={label} style={[styles.weekdayLabel, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
-                {label}
-              </Text>
-            ))}
-          </View>
-          <View style={styles.weekRow}>
-            {getWeekDates(anchor).map((d) => {
-              const key = toISODate(d);
-              return (
-                <DayCell
-                  key={key}
-                  date={d}
-                  tasks={tasksByDate[key] ?? []}
-                  isToday={key === todayKey}
-                  onPressTask={onPressTask}
-                />
-              );
-            })}
-          </View>
+        <View style={styles.weekRow}>
+          {getWeekDates(anchor).map((d) => renderCell(d, true))}
         </View>
       ) : (
         monthGrid.map((week, wi) => (
           <View key={wi} style={styles.monthRow}>
-            {week.map((d) => {
-              const key = toISODate(d);
-              return (
-                <DayCell
-                  key={key}
-                  date={d}
-                  tasks={tasksByDate[key] ?? []}
-                  isToday={key === todayKey}
-                  onPressTask={onPressTask}
-                />
-              );
-            })}
+            {week.map((d) => renderCell(d, toISODate(d).slice(0, 7) === monthKey))}
           </View>
         ))
       )}
@@ -157,6 +168,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 6,
     gap: 4,
+    backgroundColor: Platform.OS === "web" ? "rgba(0,0,0,0)" : undefined,
   },
   cellTop: {
     alignItems: "center",

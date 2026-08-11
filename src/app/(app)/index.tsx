@@ -70,8 +70,16 @@ export default function TodayScreen() {
       {width >= 1024 ? <DashboardStats tasks={tasks} /> : null}
 
       {overdue.length > 0 ? (
-        <View style={[styles.overdueStrip, { backgroundColor: colors.dangerSoft }]}>
+        <View
+          style={[
+            styles.overdueCard,
+            { backgroundColor: colors.dangerSoft, borderColor: colors.danger },
+          ]}
+        >
           <View style={styles.overdueHeader}>
+            <View style={[styles.overdueIcon, { backgroundColor: colors.danger }]}>
+              <Feather name="alert-circle" size={13} color={colors.onAccent} />
+            </View>
             <Text style={[styles.overdueLabel, { color: colors.danger, fontFamily: fonts.monoMedium }]}>
               OVERDUE · {overdue.length}
             </Text>
@@ -129,16 +137,27 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
-  overdueStrip: {
+  overdueCard: {
     borderRadius: 14,
-    paddingHorizontal: 4,
-    paddingTop: 8,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingTop: 10,
     paddingBottom: 4,
     marginTop: 16,
   },
   overdueHeader: {
-    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 4,
     paddingBottom: 4,
+  },
+  overdueIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
   },
   overdueLabel: {
     fontSize: 11,
