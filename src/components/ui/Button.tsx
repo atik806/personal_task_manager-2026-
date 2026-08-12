@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,7 +10,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../../hooks/use-theme";
-import { elevation, MIN_TOUCH } from "../../lib/theme";
+import { fonts, glow, MIN_TOUCH, radius } from "../../lib/theme";
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -64,15 +65,19 @@ export function Button({
         onPress={onPress}
         onPressIn={() => animate(0.96)}
         onPressOut={() => animate(1)}
-        style={({ pressed }) => [
+        style={({ pressed, hovered }) => [
           styles.base,
           variant === "ghost" ? { borderColor: colors.line } : null,
           variant === "secondary" ? { backgroundColor: colors.buttonSecondaryBg, borderColor: "transparent" } : null,
           variant === "danger" ? { backgroundColor: colors.danger, borderColor: "transparent" } : null,
-          !isSolid && pressed ? { backgroundColor: colors.hover } : null,
+          !isSolid && (pressed || (Platform.OS === "web" && hovered)) ? { backgroundColor: colors.hover } : null,
           disabled || loading ? { opacity: 0.5 } : null,
           variant === "primary"
-            ? { ...elevation(colors, "sm"), shadowOpacity: disabled ? 0 : 0.16 }
+            ? {
+                ...glow(colors, "soft"),
+                borderRadius: radius.pill,
+                shadowOpacity: disabled ? 0 : 0.4,
+              }
             : null,
           { minHeight: MIN_TOUCH },
         ]}
@@ -95,7 +100,7 @@ export function Button({
                 styles.label,
                 {
                   color: fg,
-                  fontFamily: isSolid ? "Inter_600SemiBold" : "Inter_500Medium",
+                  fontFamily: isSolid ? fonts.bodySemiBold : fonts.bodyMedium,
                 },
               ]}
             >
@@ -111,7 +116,7 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     minHeight: MIN_TOUCH,
-    borderRadius: 12,
+    borderRadius: radius.md,
     paddingHorizontal: 16,
     paddingVertical: 10,
     alignItems: "center",

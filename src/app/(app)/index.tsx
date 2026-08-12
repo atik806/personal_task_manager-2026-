@@ -1,19 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Link } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useDeleteTask, useProjects, useSaveTask, useTags, useTasks, useToggleTask } from "../../lib/query";
 import { taskInsertFromPatch } from "../../lib/task-utils";
 import { formatLongDate, isBeforeToday, todayKey } from "../../lib/dates";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
+import { tapHaptic } from "../../lib/haptics";
 import type { TaskUpdate, TaskWithTags } from "../../lib/types";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { TaskList } from "../../components/TaskList";
 import { TaskItem } from "../../components/TaskItem";
 import { TaskDetailSheet } from "../../components/TaskDetailSheet";
-import { DashboardStats } from "../../components/DashboardStats";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { Button } from "../../components/ui/Button";
 import { useQuickAdd } from "../../components/QuickAddProvider";
@@ -21,7 +22,6 @@ import { useQuickAdd } from "../../components/QuickAddProvider";
 export default function TodayScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const { width } = useWindowDimensions();
   const { open: openQuickAdd } = useQuickAdd();
 
   const tasksQ = useTasks(user?.id);
@@ -64,10 +64,27 @@ export default function TodayScreen() {
   };
 
   return (
-    <Screen>
-      <ScreenHeader title="Today" subtitle={formatLongDate(tk)} />
-
-      {width >= 1024 ? <DashboardStats tasks={tasks} /> : null}
+    <Screen scroll>
+      <ScreenHeader
+        title="Today"
+        subtitle={formatLongDate(tk)}
+        action={
+          <Link href="/search" asChild accessibilityLabel="Search tasks">
+            <Pressable
+              accessibilityRole="button"
+              onPress={tapHaptic}
+              style={({ pressed, hovered }) => [
+                styles.headerAction,
+                { borderColor: colors.line },
+                Platform.OS === "web" && hovered ? { backgroundColor: colors.hover } : null,
+                pressed ? { opacity: 0.7 } : null,
+              ]}
+            >
+              <Ionicons name="search" size={20} color={colors.inkSecondary} />
+            </Pressable>
+          </Link>
+        }
+      />
 
       {overdue.length > 0 ? (
         <View
@@ -78,7 +95,7 @@ export default function TodayScreen() {
         >
           <View style={styles.overdueHeader}>
             <View style={[styles.overdueIcon, { backgroundColor: colors.danger }]}>
-              <Feather name="alert-circle" size={13} color={colors.onAccent} />
+              <Ionicons name="alert-circle" size={14} color={colors.onAccent} />
             </View>
             <Text style={[styles.overdueLabel, { color: colors.danger, fontFamily: fonts.monoMedium }]}>
               OVERDUE · {overdue.length}
@@ -91,6 +108,7 @@ export default function TodayScreen() {
               project={task.project_id ? projectsById[task.project_id] : undefined}
               onPress={() => setSelected(task)}
               onToggle={() => toggleTask.mutate(task)}
+              onDelete={() => deleteTask.mutate(task.id)}
               showOverdueLabel={false}
             />
           ))}
@@ -103,17 +121,18 @@ export default function TodayScreen() {
           projectsById={projectsById}
           onPressTask={setSelected}
           onToggleTask={(t) => toggleTask.mutate(t)}
+          onDeleteTask={(t) => deleteTask.mutate(t.id)}
         />
       ) : (
-        <View style={{ marginTop: 8 }}>
+        <View style={styles.emptyWrap}>
           <EmptyState
-            icon="sun"
-            title="Nothing due today"
+            icon="sunny"
+            title="Nothing due today."
             message="Enjoy the calm. Overdue and scheduled tasks will show up here."
             action={
               <Button
                 label="Add a task"
-                icon={<Feather name="plus" size={16} color={colors.onAccent} />}
+                icon={<Ionicons name="add" size={16} color={colors.onAccent} />}
                 onPress={openQuickAdd}
               />
             }
@@ -137,8 +156,20 @@ export default function TodayScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyWrap: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   overdueCard: {
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingTop: 10,
@@ -155,7 +186,7 @@ const styles = StyleSheet.create({
   overdueIcon: {
     width: 22,
     height: 22,
-    borderRadius: 7,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },

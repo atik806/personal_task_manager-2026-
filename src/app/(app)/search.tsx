@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useDeleteTask, useProjects, useSaveTask, useTags, useTasks, useToggleTask } from "../../lib/query";
@@ -21,6 +22,7 @@ function normalize(s: string): string {
 export default function SearchScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<TaskWithTags | null>(null);
 
@@ -58,11 +60,11 @@ export default function SearchScreen() {
   const showResults = normalize(query).length > 0;
 
   return (
-    <Screen>
-      <ScreenHeader title="Search" subtitle="Find any task, tag, or project" />
+    <Screen scroll>
+      <ScreenHeader title="Search" subtitle="Find any task, tag, or project" onBack={() => router.back()} />
       <View style={styles.searchRow}>
         <View style={styles.searchIcon}>
-          <Feather name="search" size={16} color={colors.inkSecondary} />
+          <Ionicons name="search" size={17} color={colors.inkSecondary} />
         </View>
         <TextField
           value={query}
@@ -83,7 +85,7 @@ export default function SearchScreen() {
         {!showResults ? (
           <EmptyState icon="search" title="Type to search" message="Matches titles, notes, tags, and project names." />
         ) : results.length === 0 ? (
-          <EmptyState icon="inbox" title="No matches" message={`Nothing matched "${query}". Try a different term.`} />
+          <EmptyState icon="file-tray" title="No matches" message={`Nothing matched "${query}". Try a different term.`} />
         ) : (
           <TaskList
             tasks={results}
@@ -91,6 +93,7 @@ export default function SearchScreen() {
             grouped={false}
             onPressTask={setSelected}
             onToggleTask={(t) => toggleTask.mutate(t)}
+            onDeleteTask={(t) => deleteTask.mutate(t.id)}
           />
         )}
       </View>

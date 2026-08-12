@@ -1,22 +1,23 @@
 import React from "react";
 import { View } from "react-native";
 import { useTheme } from "../hooks/use-theme";
+import type { ThemeColors } from "../lib/theme";
 
 /**
  * The Day Spine — a vertical line running down the left edge of the day's
  * task list with a node at each task. Node color:
- *   grey = pending · coral = overdue · green = done.
+ *   muted = pending · danger = overdue · success = done.
  */
 export type SpineNodeColor = "pending" | "overdue" | "done";
 
-export function spineColor(kind: SpineNodeColor): string {
+export function spineColor(kind: SpineNodeColor, colors: ThemeColors): string {
   switch (kind) {
     case "overdue":
-      return "#FF6B5B";
+      return colors.danger;
     case "done":
-      return "#34B27B";
+      return colors.success;
     default:
-      return "#9BA0B0";
+      return colors.inkMuted;
   }
 }
 
@@ -30,7 +31,7 @@ export function SpineNode({ kind }: { kind: SpineNodeColor }) {
             width: 10,
             height: 10,
             borderRadius: 5,
-            backgroundColor: spineColor(kind),
+            backgroundColor: spineColor(kind, colors),
             marginTop: 7,
           }}
         />

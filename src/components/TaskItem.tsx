@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useTheme } from "../hooks/use-theme";
 import { formatTimeHHMM, isBeforeToday, todayKey } from "../lib/dates";
 import type { ProjectRow, TaskWithTags } from "../lib/types";
-import { fonts } from "../lib/theme";
+import { elevation, fonts, radius } from "../lib/theme";
+import { completeHaptic, deleteHaptic } from "../lib/haptics";
 import { Checkbox } from "./ui/Checkbox";
 import { SpineNode, type SpineNodeColor } from "./DaySpine";
 
@@ -23,11 +25,23 @@ interface TaskItemProps {
   project?: ProjectRow | null;
   onPress: () => void;
   onToggle: () => void;
+  onDelete?: () => void;
   showTime?: boolean;
   showOverdueLabel?: boolean;
+  /** Renders as a bordered card with shadow, violet time chip + violet checkbox. */
+  card?: boolean;
 }
 
-export function TaskItem({ task, project, onPress, onToggle, showTime = true, showOverdueLabel = true }: TaskItemProps) {
+export function TaskItem({
+  task,
+  project,
+  onPress,
+  onToggle,
+  onDelete,
+  showTime = true,
+  showOverdueLabel = true,
+  card = false,
+}: TaskItemProps) {
   const { colors } = useTheme();
   const done = task.status === "done";
   const overdue = isTaskOverdue(task);
@@ -47,7 +61,17 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
     prevStatus.current = task.status;
   }, [task.status, anim]);
 
-  return (
+  const handleToggle = () => {
+    if (!done) completeHaptic();
+    onToggle();
+  };
+
+  const handleComplete = () => {
+    if (!done) completeHaptic();
+    onToggle();
+  };
+
+  const row = (
     <Animated.View
       style={{
         opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
@@ -62,9 +86,19 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
         accessibilityLabel={`${task.title}${task.due_time ? ` at ${formatTimeHHMM(task.due_time)}` : ""}`}
         style={({ pressed, hovered }) => [
           styles.row,
+          card
+            ? [
+                styles.rowCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.line,
+                  ...elevation(colors, "sm"),
+                },
+              ]
+            : null,
           done ? { backgroundColor: colors.successSoft } : null,
           (pressed || (Platform.OS === "web" && hovered)) && !done
-            ? { backgroundColor: colors.hover }
+            ? { backgroundColor: card ? colors.accentSoft : colors.hover }
             : null,
         ]}
       >
@@ -76,7 +110,7 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
               styles.title,
               {
                 color: colors.ink,
-                fontFamily: fonts.bodyMedium,
+                fontFamily: card ? fonts.bodySemiBold : fonts.bodyMedium,
                 textDecorationLine: done ? "line-through" : "none",
                 opacity: done ? 0.7 : 1,
               },
@@ -86,16 +120,26 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
           </Text>
           <View style={styles.metaRow}>
             {showTime && task.due_time ? (
-              <View style={[styles.timeChip, { backgroundColor: colors.chipBg }]}>
-                <Feather name="clock" size={10} color={colors.inkSecondary} />
-                <Text style={[styles.timeText, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
+              <View
+                style={[
+                  styles.timeChip,
+                  card ? { backgroundColor: colors.accentSoft } : { backgroundColor: colors.chipBg },
+                ]}
+              >
+                <Ionicons name="time" size={12} color={card ? colors.accent : colors.inkSecondary} />
+                <Text
+                  style={[
+                    styles.timeText,
+                    { color: card ? colors.accent : colors.inkSecondary, fontFamily: fonts.monoMedium },
+                  ]}
+                >
                   {formatTimeHHMM(task.due_time)}
                 </Text>
               </View>
             ) : null}
             {overdue && showOverdueLabel ? (
               <View style={[styles.badge, { backgroundColor: colors.dangerSoft }]}>
-                <Feather name="alert-circle" size={11} color={colors.danger} />
+                <Ionicons name="alert-circle" size={12} color={colors.danger} />
                 <Text style={{ fontFamily: fonts.monoMedium, fontSize: 11, color: colors.danger }}>
                   Overdue
                 </Text>
@@ -103,7 +147,7 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
             ) : null}
             {task.priority === "high" && !done ? (
               <View style={[styles.badge, { backgroundColor: colors.dangerSoft }]}>
-                <Feather name="flag" size={11} color={colors.danger} />
+                <Ionicons name="flag" size={12} color={colors.danger} />
                 <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 11, color: colors.danger }}>
                   High
                 </Text>
@@ -124,19 +168,68 @@ export function TaskItem({ task, project, onPress, onToggle, showTime = true, sh
             ) : null}
             {task.recurrence_rule ? (
               <View style={[styles.repeatChip, { backgroundColor: colors.chipBg }]}>
-                <Feather name="repeat" size={11} color={colors.inkSecondary} />
+                <Ionicons name="repeat" size={12} color={colors.inkSecondary} />
               </View>
             ) : null}
           </View>
         </View>
         <Checkbox
           checked={done}
-          successColor
-          onPress={onToggle}
+          successColor={!card}
+          onPress={handleToggle}
           accessibilityLabel={done ? `Mark ${task.title} as not done` : `Complete ${task.title}`}
         />
       </Pressable>
     </Animated.View>
+  );
+
+  if (Platform.OS === "web") return row;
+
+  const renderDeleteActions = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Delete ${task.title}`}
+      onPress={() => {
+        onDelete?.();
+        deleteHaptic();
+      }}
+      style={({ pressed }) => [
+        styles.deleteAction,
+        { backgroundColor: colors.danger },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
+      <Ionicons name="trash" size={20} color={colors.onAccent} />
+    </Pressable>
+  );
+
+  const renderCompleteActions = () => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
+      onPress={handleComplete}
+      style={({ pressed }) => [
+        styles.completeAction,
+        { backgroundColor: colors.success },
+        pressed ? { opacity: 0.8 } : null,
+      ]}
+    >
+      <Ionicons name="checkmark" size={20} color={colors.onAccent} />
+    </Pressable>
+  );
+
+  return (
+    <ReanimatedSwipeable
+      friction={2}
+      rightThreshold={40}
+      leftThreshold={40}
+      overshootLeft={false}
+      overshootRight={false}
+      renderRightActions={onDelete ? renderDeleteActions : undefined}
+      renderLeftActions={renderCompleteActions}
+    >
+      {row}
+    </ReanimatedSwipeable>
   );
 }
 
@@ -146,7 +239,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 56,
     paddingRight: 12,
-    borderRadius: 12,
+    borderRadius: radius.md,
+  },
+  rowCard: {
+    marginVertical: 5,
+    marginRight: 4,
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
   },
   content: {
     flex: 1,
@@ -173,7 +273,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   timeText: {
     fontSize: 11,
@@ -181,7 +281,7 @@ const styles = StyleSheet.create({
   repeatChip: {
     width: 20,
     height: 20,
-    borderRadius: 6,
+    borderRadius: radius.xs,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -191,7 +291,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: radius.xs,
   },
   metaGroup: {
     flexDirection: "row",
@@ -203,5 +303,21 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  deleteAction: {
+    width: 72,
+    margin: 4,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "stretch",
+  },
+  completeAction: {
+    width: 72,
+    margin: 4,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "stretch",
   },
 });

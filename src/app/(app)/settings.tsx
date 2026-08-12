@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Platform, StyleSheet, Switch, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useTheme } from "../../hooks/use-theme";
@@ -8,7 +8,7 @@ import { useAuth } from "../../hooks/use-auth";
 import { useTasks } from "../../lib/query";
 import { updatePassword } from "../../lib/supabase";
 import { downloadTextFile, exportStamp, tasksToCSV, tasksToJSON } from "../../lib/export";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 import { getRemindersEnabled, isReminderSupported, setRemindersEnabled } from "../../lib/notifications";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -169,14 +169,14 @@ export default function SettingsScreen() {
           <Button
             label="Export CSV"
             variant="secondary"
-            icon={<Feather name="download" size={16} color={colors.ink} />}
+            icon={<Ionicons name="download" size={17} color={colors.ink} />}
             onPress={() => handleExport("csv")}
             disabled={(tasksQ.data?.length ?? 0) === 0}
           />
           <Button
             label="Export JSON"
             variant="secondary"
-            icon={<Feather name="file-text" size={16} color={colors.ink} />}
+            icon={<Ionicons name="document-text" size={17} color={colors.ink} />}
             onPress={() => handleExport("json")}
             disabled={(tasksQ.data?.length ?? 0) === 0}
           />
@@ -193,7 +193,7 @@ export default function SettingsScreen() {
                 {user.email}
               </Text>
             </View>
-            <Feather name="check-circle" size={18} color={colors.success} />
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
           </View>
         ) : null}
         <View style={[styles.divider, { backgroundColor: colors.line }]} />
@@ -232,7 +232,7 @@ export default function SettingsScreen() {
         <Button
           label="Sign out"
           variant="danger"
-          icon={<Feather name="log-out" size={16} color="#FFFFFF" />}
+          icon={<Ionicons name="log-out" size={17} color="#FFFFFF" />}
           onPress={() => signOut()}
         />
       </View>
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 16,
     gap: 8,

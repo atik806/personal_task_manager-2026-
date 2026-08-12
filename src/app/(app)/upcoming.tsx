@@ -1,11 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Link } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useDeleteTask, useProjects, useSaveTask, useTags, useTasks, useToggleTask } from "../../lib/query";
 import { taskInsertFromPatch } from "../../lib/task-utils";
 import { formatLongDate, isBeforeToday, todayKey } from "../../lib/dates";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
+import { tapHaptic } from "../../lib/haptics";
 import type { TaskUpdate, TaskWithTags } from "../../lib/types";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -64,8 +67,27 @@ export default function UpcomingScreen() {
   const empty = tasksQ.data?.length === 0;
 
   return (
-    <Screen>
-      <ScreenHeader title="Upcoming" subtitle="Everything with a due date" />
+    <Screen scroll>
+      <ScreenHeader
+        title="Upcoming"
+        subtitle="Everything with a due date"
+        action={
+          <Link href="/calendar" asChild accessibilityLabel="Open calendar">
+            <Pressable
+              accessibilityRole="button"
+              onPress={tapHaptic}
+              style={({ pressed, hovered }) => [
+                styles.headerAction,
+                { backgroundColor: colors.accentSoft },
+                Platform.OS === "web" && hovered ? { backgroundColor: colors.hover } : null,
+                pressed ? { opacity: 0.7 } : null,
+              ]}
+            >
+              <Ionicons name="calendar" size={20} color={colors.accent} />
+            </Pressable>
+          </Link>
+        }
+      />
       <View style={styles.filterRow}>
         <SegmentedControl<Filter>
           options={[
@@ -90,10 +112,12 @@ export default function UpcomingScreen() {
                   OVERDUE
                 </Text>
                 <TaskList
+                  card
                   tasks={overdue}
                   projectsById={projectsById}
                   onPressTask={setSelected}
                   onToggleTask={(t) => toggleTask.mutate(t)}
+                  onDeleteTask={(t) => deleteTask.mutate(t.id)}
                 />
               </View>
             ) : null
@@ -106,10 +130,12 @@ export default function UpcomingScreen() {
                   {formatLongDate(date).toUpperCase()}
                 </Text>
                 <TaskList
+                  card
                   tasks={list}
                   projectsById={projectsById}
                   onPressTask={setSelected}
                   onToggleTask={(t) => toggleTask.mutate(t)}
+                  onDeleteTask={(t) => deleteTask.mutate(t.id)}
                 />
               </View>
             ))
@@ -122,23 +148,25 @@ export default function UpcomingScreen() {
                   NO DATE
                 </Text>
                 <TaskList
+                  card
                   tasks={noDate}
                   projectsById={projectsById}
                   onPressTask={setSelected}
                   onToggleTask={(t) => toggleTask.mutate(t)}
+                  onDeleteTask={(t) => deleteTask.mutate(t.id)}
                 />
               </View>
             ) : null
           ) : null}
 
           {filter === "overdue" && overdue.length === 0 ? (
-            <EmptyState icon="check-circle" title="Nothing overdue" message="You're all caught up." />
+            <EmptyState icon="checkmark-circle" title="Nothing overdue" message="You're all caught up." />
           ) : null}
           {filter === "upcoming" && upcoming.length === 0 ? (
             <EmptyState icon="calendar" title="Nothing scheduled" message="Add a due date to a task to schedule it." />
           ) : null}
           {filter === "nodate" && noDate.length === 0 ? (
-            <EmptyState icon="inbox" title="No undated tasks" message="Every task has a date. Impressive." />
+            <EmptyState icon="file-tray" title="No undated tasks" message="Every task has a date. Impressive." />
           ) : null}
         </View>
       )}
@@ -164,6 +192,13 @@ export default function UpcomingScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   filterRow: {
     marginBottom: 8,
   },

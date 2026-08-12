@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../hooks/use-theme";
-import { fonts } from "../lib/theme";
+import { fonts, radius, type ThemeColors } from "../lib/theme";
 import {
   SLOT_ORDER,
   compareTime,
@@ -13,13 +13,30 @@ import type { ProjectRow, TaskWithTags } from "../lib/types";
 import { TaskItem } from "./TaskItem";
 import { EmptyState } from "./ui/EmptyState";
 
+/** Period dot color: morning green, afternoon amber, evening violet, no-time muted. */
+function slotColor(slot: DaySlot, colors: ThemeColors): string {
+  switch (slot) {
+    case "morning":
+      return colors.success;
+    case "afternoon":
+      return colors.warning;
+    case "evening":
+      return colors.accent;
+    default:
+      return colors.inkMuted;
+  }
+}
+
 interface TaskListProps {
   tasks: TaskWithTags[];
   projectsById?: Record<string, ProjectRow>;
   /** When true, tasks are shown under Morning/Afternoon/Evening/No time headers. */
   grouped?: boolean;
+  /** When true, renders each task as a bordered card (violet time chip + checkbox). */
+  card?: boolean;
   onPressTask: (task: TaskWithTags) => void;
   onToggleTask: (task: TaskWithTags) => void;
+  onDeleteTask?: (task: TaskWithTags) => void;
   emptyTitle?: string;
   emptyMessage?: string;
 }
@@ -28,8 +45,10 @@ export function TaskList({
   tasks,
   projectsById = {},
   grouped = true,
+  card = false,
   onPressTask,
   onToggleTask,
+  onDeleteTask,
   emptyTitle = "All clear",
   emptyMessage = "Nothing here yet. Add a task to get started.",
 }: TaskListProps) {
@@ -57,7 +76,7 @@ export function TaskList({
   }, [tasks, grouped]);
 
   if (tasks.length === 0) {
-    return <EmptyState icon="check-circle" title={emptyTitle} message={emptyMessage} />;
+    return <EmptyState icon="checkmark-circle" title={emptyTitle} message={emptyMessage} />;
   }
 
   return (
@@ -65,12 +84,12 @@ export function TaskList({
       {sections.map(({ slot, tasks: sectionTasks }) => (
         <View key={slot} style={styles.section}>
           <View style={styles.sectionHeader}>
-            <View style={[styles.sectionDot, { backgroundColor: colors.accent }]} />
+            <View style={[styles.sectionDot, { backgroundColor: slotColor(slot, colors) }]} />
             <Text style={[styles.sectionTitle, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
               {slotLabel(slot)}
             </Text>
-            <View style={[styles.sectionCountChip, { backgroundColor: colors.chipBg }]}>
-              <Text style={[styles.sectionCount, { color: colors.inkSecondary, fontFamily: fonts.mono }]}>
+            <View style={[styles.sectionCountChip, { backgroundColor: colors.accentSoft }]}>
+              <Text style={[styles.sectionCount, { color: colors.accent, fontFamily: fonts.monoMedium }]}>
                 {sectionTasks.length}
               </Text>
             </View>
@@ -79,9 +98,11 @@ export function TaskList({
             <TaskItem
               key={task.id}
               task={task}
+              card={card}
               project={task.project_id ? projectsById[task.project_id] : undefined}
               onPress={() => onPressTask(task)}
               onToggle={() => onToggleTask(task)}
+              onDelete={() => onDeleteTask?.(task)}
             />
           ))}
         </View>
@@ -108,7 +129,7 @@ const styles = StyleSheet.create({
   sectionDot: {
     width: 7,
     height: 7,
-    borderRadius: 4,
+    borderRadius: radius.xs,
   },
   sectionTitle: {
     fontSize: 11,
@@ -118,7 +139,7 @@ const styles = StyleSheet.create({
   sectionCountChip: {
     paddingHorizontal: 6,
     paddingVertical: 1,
-    borderRadius: 999,
+    borderRadius: radius.pill,
   },
   sectionCount: {
     fontSize: 10,

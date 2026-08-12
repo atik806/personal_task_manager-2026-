@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Animated, Pressable, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
 
 interface CheckboxProps {
@@ -36,6 +36,7 @@ export function Checkbox({
   }, [checked, anim]);
 
   const fillColor = successColor ? colors.success : colors.accent;
+  const tickColor = colors.surface;
 
   return (
     <Pressable
@@ -45,7 +46,7 @@ export function Checkbox({
       disabled={disabled}
       onPress={onPress}
       hitSlop={10}
-      style={styles.hitArea}
+      style={({ pressed }) => [styles.hitArea, pressed ? { opacity: 0.6 } : null]}
     >
       <Animated.View
         style={[
@@ -66,7 +67,7 @@ export function Checkbox({
             transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
           }}
         >
-          <Feather name="check" size={size - 8} color="#FFFFFF" strokeWidth={3} />
+          <Ionicons name="checkmark" size={size - 8} color={tickColor} />
         </Animated.View>
       </Animated.View>
     </Pressable>

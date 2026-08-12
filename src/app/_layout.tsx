@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { SpaceGrotesk_500Medium, SpaceGrotesk_700Bold } from "@expo-google-fonts/space-grotesk";
@@ -58,9 +59,11 @@ export default function RootLayout() {
       persistOptions={{ persister: queryPersister, maxAge: 1000 * 60 * 60 * 24, buster: QUERY_CACHE_BUSTER }}
     >
       <ThemeProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
+        </GestureHandlerRootView>
       </ThemeProvider>
     </PersistQueryClientProvider>
   );

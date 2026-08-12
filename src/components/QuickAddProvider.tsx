@@ -1,10 +1,14 @@
 import React, { createContext, useCallback, useContext, useState } from "react";
-import { Platform, Pressable, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/use-theme";
 import { useAuth } from "../hooks/use-auth";
 import { ensureTag, insertProject, supabase } from "../lib/supabase";
-import { useSaveTask } from "../lib/query";
+import { invalidateTags, useSaveTask } from "../lib/query";
+import { fonts, glow, radius } from "../lib/theme";
+import { tapHaptic } from "../lib/haptics";
 import type { TaskInsert } from "../lib/types";
 import type { QuickAddResult } from "../lib/parse";
 import { QuickAddSheet } from "./QuickAddSheet";
@@ -18,6 +22,7 @@ export function useQuickAdd() {
 export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const saveTask = useSaveTask(user?.id ?? "");
 
@@ -32,6 +37,9 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           // individual tag failures don't block the task
         }
       }
+      // ensureTag creates rows outside useCreateTag; invalidate so the Tags
+      // screen reflects them immediately instead of after the 30s staleTime.
+      if (tagIds.length) invalidateTags(user.id);
 
       let projectId: string | null = null;
       if (result.project) {
@@ -78,20 +86,55 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     <QuickAddContext.Provider value={{ open: openQuickAdd }}>
       {children}
       <QuickAddSheet open={open} onClose={() => setOpen(false)} onCreate={handleCreate} />
-      {Platform.OS !== "web" ? (
+      {Platform.OS === "web" ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="New task"
-          onPress={openQuickAdd}
-          style={({ pressed }) => [
-            styles.fab,
-            { backgroundColor: colors.accent },
-            pressed ? { opacity: 0.85 } : null,
+          onPress={() => {
+            tapHaptic();
+            openQuickAdd();
+          }}
+          style={({ pressed, hovered }) => [
+            styles.fabWeb,
+            { ...glow(colors, "strong") },
+            hovered && !pressed ? styles.fabWebLift : null,
+            pressed ? { opacity: 0.85, transform: [{ scale: 0.96 }] } : null,
           ]}
         >
-          <Feather name="plus" size={24} color={colors.onAccent} />
+          <LinearGradient
+            colors={colors.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabWebGradient}
+          >
+            <Ionicons name="add" size={20} color={colors.onAccent} />
+            <Text style={[styles.fabWebLabel, { color: colors.onAccent }]}>New task</Text>
+          </LinearGradient>
         </Pressable>
-      ) : null}
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="New task"
+          onPress={() => {
+            tapHaptic();
+            openQuickAdd();
+          }}
+          style={({ pressed }) => [
+            styles.fab,
+            { bottom: 88 + insets.bottom, ...glow(colors, "strong") },
+            pressed ? { opacity: 0.85, transform: [{ scale: 0.92 }] } : null,
+          ]}
+        >
+          <LinearGradient
+            colors={colors.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fabGradient}
+          >
+            <Ionicons name="add" size={24} color={colors.onAccent} />
+          </LinearGradient>
+        </Pressable>
+      )}
     </QuickAddContext.Provider>
   );
 }
@@ -100,16 +143,39 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 96,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 58,
+    height: 58,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+  },
+  fabGradient: {
+    width: 58,
+    height: 58,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fabWeb: {
+    position: "absolute",
+    right: 24,
+    bottom: 24,
+    borderRadius: radius.pill,
+    overflow: "hidden",
+  },
+  fabWebGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
+  },
+  fabWebLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+  },
+  fabWebLift: {
+    transform: [{ translateY: -2 }],
   },
 });

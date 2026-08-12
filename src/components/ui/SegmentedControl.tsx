@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../hooks/use-theme";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 
 interface SegmentedControlProps<T extends string> {
   options: { value: T; label: string }[];
@@ -38,10 +38,13 @@ export function SegmentedControl<T extends string>({
     }
   }, [index, thumb]);
 
-  const thumbLeft = thumb.interpolate({
-    inputRange: [0, count - 1],
-    outputRange: Array.from({ length: count }, (_, i) => `${(i * 100) / count}%`),
-  });
+  const thumbLeft =
+    count <= 1
+      ? "0%"
+      : thumb.interpolate({
+          inputRange: Array.from({ length: count }, (_, i) => i),
+          outputRange: Array.from({ length: count }, (_, i) => `${(i * 100) / count}%`),
+        });
 
   return (
     <View
@@ -65,7 +68,11 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(opt.value)}
-            style={({ pressed }) => [styles.item, pressed ? { opacity: 0.8 } : null]}
+            style={({ pressed, hovered }) => [
+              styles.item,
+              Platform.OS === "web" && hovered && !active ? { backgroundColor: colors.hover } : null,
+              pressed ? { opacity: 0.8 } : null,
+            ]}
           >
             <Text
               numberOfLines={1}
@@ -87,7 +94,7 @@ export function SegmentedControl<T extends string>({
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     padding: 3,
   },
@@ -95,7 +102,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 3,
     bottom: 3,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     shadowOpacity: 0.08,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
@@ -104,7 +111,7 @@ const styles = StyleSheet.create({
   item: {
     flex: 1,
     minHeight: 32,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 10,

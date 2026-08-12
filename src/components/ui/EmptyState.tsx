@@ -1,11 +1,11 @@
 import React from "react";
 import { Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
-import { fonts } from "../../lib/theme";
+import { fonts, glow, radius } from "../../lib/theme";
 
 interface EmptyStateProps {
-  icon: keyof typeof Feather.glyphMap;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   message?: string;
   action?: React.ReactNode;
@@ -14,59 +14,68 @@ interface EmptyStateProps {
 export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   const { colors } = useTheme();
   return (
-    <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 48, paddingHorizontal: 24, gap: 8 }}>
-      <View style={{ position: "relative", marginBottom: 6 }}>
-        <View
-          style={{
-            position: "absolute",
-            top: -10,
-            left: -10,
-            width: 76,
-            height: 76,
-            borderRadius: 38,
-            borderWidth: 1,
-            borderColor: colors.lineStrong,
-            opacity: 0.5,
-          }}
-        />
-        <View
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: 28,
-            backgroundColor: colors.accentSoft,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1,
-            borderColor: "transparent",
-            shadowColor: colors.shadowColor,
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 2,
-          }}
-        >
-          <Feather name={icon} size={24} color={colors.accent} />
+    <View style={styles.wrap}>
+      <View style={styles.badgeWrap}>
+        <View style={[styles.badge, { backgroundColor: colors.accentSoft }, glow(colors, "soft")]}>
+          <Ionicons name={icon} size={30} color={colors.accent} />
         </View>
+        <View style={[styles.ring, { borderColor: colors.lineStrong }]} />
       </View>
-      <Text style={{ fontFamily: fonts.displayBold, fontSize: 17, color: colors.ink, textAlign: "center" }}>
-        {title}
-      </Text>
-      {message ? (
-        <Text
-          style={{
-            fontFamily: fonts.body,
-            fontSize: 14,
-            color: colors.inkSecondary,
-            textAlign: "center",
-            maxWidth: 320,
-            lineHeight: 20,
-          }}
-        >
-          {message}
-        </Text>
-      ) : null}
-      {action ? <View style={{ marginTop: 8 }}>{action}</View> : null}
+      <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
+      {message ? <Text style={[styles.message, { color: colors.inkSecondary }]}>{message}</Text> : null}
+      {action ? <View style={styles.action}>{action}</View> : null}
     </View>
   );
 }
+
+const styles = {
+  wrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 56,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  badgeWrap: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 116,
+    height: 116,
+    marginBottom: 14,
+  },
+  badge: {
+    width: 84,
+    height: 84,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ring: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    width: 104,
+    height: 104,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    opacity: 0.4,
+  },
+  title: {
+    fontFamily: fonts.displayBold,
+    fontSize: 21,
+    lineHeight: 27,
+    letterSpacing: -0.4,
+    textAlign: "center",
+  },
+  message: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    maxWidth: 340,
+  },
+  action: {
+    marginTop: 14,
+  },
+} as const;

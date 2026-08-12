@@ -1,7 +1,7 @@
 import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../hooks/use-theme";
-import { fonts } from "../lib/theme";
+import { fonts, radius } from "../lib/theme";
 import { getMonthGrid, getWeekDates, toISODate, today } from "../lib/dates";
 import type { TaskWithTags } from "../lib/types";
 
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 64,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     padding: 6,
     gap: 4,
     backgroundColor: Platform.OS === "web" ? "rgba(0,0,0,0)" : undefined,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   dayNum: {
     width: 26,
     height: 26,
-    borderRadius: 13,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   taskDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: radius.xs,
   },
   more: {
     textAlign: "center",

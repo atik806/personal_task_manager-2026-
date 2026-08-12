@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useCreateTag, useDeleteTag, useTags, useTasks } from "../../lib/query";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { Button } from "../../components/ui/Button";
@@ -14,6 +15,7 @@ import { EmptyState } from "../../components/ui/EmptyState";
 export default function TagsScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -49,7 +51,7 @@ export default function TagsScreen() {
 
   return (
     <Screen scroll>
-      <ScreenHeader title="Tags" subtitle="Categorize tasks with labels" />
+      <ScreenHeader title="Tags" subtitle="Categorize tasks with labels" onBack={() => router.back()} />
 
       <View style={[styles.newCard, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <Text style={[styles.sectionLabel, { color: colors.inkSecondary }]}>New tag</Text>
@@ -68,7 +70,7 @@ export default function TagsScreen() {
       </View>
 
       {tags.length === 0 ? (
-        <EmptyState icon="tag" title="No tags yet" message="Tags label tasks across projects. Create one to start organizing." />
+        <EmptyState icon="pricetag" title="No tags yet" message="Tags label tasks across projects. Create one to start organizing." />
       ) : (
         <View style={styles.list}>
           {tags.map((tag) => {
@@ -101,12 +103,16 @@ export default function TagsScreen() {
                   accessibilityLabel={armed ? "Confirm delete tag" : "Delete tag"}
                   onPress={() => (armed ? handleDelete(tag.id) : setConfirmDeleteId(tag.id))}
                   hitSlop={8}
-                  style={({ pressed }) => [styles.iconBtn, pressed ? { opacity: 0.6 } : null]}
+                  style={({ pressed, hovered }) => [
+                    styles.iconBtn,
+                    Platform.OS === "web" && hovered ? { backgroundColor: colors.dangerSoft } : null,
+                    pressed ? { opacity: 0.6 } : null,
+                  ]}
                 >
                   {armed ? (
                     <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.danger }}>Sure?</Text>
                   ) : (
-                    <Feather name="trash-2" size={16} color={colors.danger} />
+                    <Ionicons name="trash" size={17} color={colors.danger} />
                   )}
                 </Pressable>
               </View>
@@ -120,7 +126,7 @@ export default function TagsScreen() {
 
 const styles = StyleSheet.create({
   newCard: {
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 16,
     gap: 10,
@@ -148,7 +154,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -156,7 +162,7 @@ const styles = StyleSheet.create({
   hash: {
     width: 32,
     height: 32,
-    borderRadius: 10,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -167,7 +173,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },

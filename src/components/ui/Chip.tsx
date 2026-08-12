@@ -1,7 +1,7 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../../hooks/use-theme";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 
 interface ChipProps {
   label: string;
@@ -29,8 +29,8 @@ export function Chip({ label, color, onPress, selected, dot = true }: ChipProps)
     ? { color: colors.accent, fontFamily: fonts.bodySemiBold }
     : { color: colors.inkSecondary, fontFamily: fonts.bodyMedium };
 
-  const content = (
-    <View style={[styles.chip, chipStyle]}>
+  const content = (hovered: boolean) => (
+    <View style={[styles.chip, chipStyle, Platform.OS === "web" && hovered && !selected ? { backgroundColor: colors.hover, borderColor: colors.lineStrong } : null]}>
       {dot && color ? <View style={[styles.dot, { backgroundColor: color }]} /> : null}
       <Text numberOfLines={1} style={[styles.label, labelStyle]}>
         {label}
@@ -38,7 +38,7 @@ export function Chip({ label, color, onPress, selected, dot = true }: ChipProps)
     </View>
   );
 
-  if (!onPress) return content;
+  if (!onPress) return content(false);
 
   return (
     <Pressable
@@ -48,14 +48,14 @@ export function Chip({ label, color, onPress, selected, dot = true }: ChipProps)
       accessibilityState={{ selected: !!selected }}
       style={({ pressed }) => [pressed ? { opacity: 0.7 } : null, styles.wrap]}
     >
-      {content}
+      {({ hovered }) => content(hovered)}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    borderRadius: 999,
+    borderRadius: radius.pill,
   },
   chip: {
     flexDirection: "row",
@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 999,
+    borderRadius: radius.pill,
     borderWidth: 1,
     maxWidth: 180,
   },

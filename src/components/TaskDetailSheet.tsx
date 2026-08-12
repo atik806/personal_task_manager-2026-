@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../hooks/use-theme";
 import { fonts } from "../lib/theme";
 import { dayKey, parseTime, todayKey } from "../lib/dates";
@@ -287,17 +287,17 @@ export function TaskDetailSheet({
           hint="Daily, weekly, monthly, or custom intervals."
         />
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { borderTopColor: colors.line }]}>
           <Button
             label={done ? "Reopen" : "Complete"}
             variant="secondary"
-            icon={<Feather name={done ? "rotate-ccw" : "check"} size={16} color={colors.success} />}
+            icon={<Ionicons name={done ? "refresh" : "checkmark"} size={17} color={colors.success} />}
             onPress={onToggle}
           />
           <Button
             label="Delete"
             variant="ghost"
-            icon={<Feather name="trash-2" size={16} color={colors.danger} />}
+            icon={<Ionicons name="trash" size={17} color={colors.danger} />}
             onPress={onDelete}
             accessibilityLabel="Delete task"
           />
@@ -330,5 +330,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: 1,
   },
 });

@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Link } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useArchiveProject, useCreateProject, useDeleteProject, useProjects, useTasks } from "../../lib/query";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
+import { tapHaptic } from "../../lib/haptics";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { Button } from "../../components/ui/Button";
@@ -12,11 +14,11 @@ import { TextField } from "../../components/ui/TextField";
 import { EmptyState } from "../../components/ui/EmptyState";
 
 const PALETTE = [
-  "#4C5FD5",
+  "#7C6BFF",
   "#34B27B",
   "#FF6B5B",
   "#F5A623",
-  "#8E7CF0",
+  "#8B7CFF",
   "#2BB3C0",
   "#E25CB5",
   "#7A869A",
@@ -80,9 +82,13 @@ export default function ProjectsScreen() {
         accessibilityLabel={p.archived ? "Unarchive project" : "Archive project"}
         onPress={() => archiveProject.mutate({ id: p.id, archived: !p.archived })}
         hitSlop={8}
-        style={({ pressed }) => [styles.iconBtn, pressed ? { opacity: 0.6 } : null]}
+        style={({ pressed, hovered }) => [
+          styles.iconBtn,
+          Platform.OS === "web" && hovered ? { backgroundColor: colors.hover } : null,
+          pressed ? { opacity: 0.6 } : null,
+        ]}
       >
-        <Feather name={p.archived ? "rotate-ccw" : "archive"} size={16} color={colors.inkSecondary} />
+        <Ionicons name={p.archived ? "refresh" : "archive"} size={17} color={colors.inkSecondary} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -96,12 +102,16 @@ export default function ProjectsScreen() {
           }
         }}
         hitSlop={8}
-        style={({ pressed }) => [styles.iconBtn, pressed ? { opacity: 0.6 } : null]}
+        style={({ pressed, hovered }) => [
+          styles.iconBtn,
+          Platform.OS === "web" && hovered ? { backgroundColor: colors.dangerSoft } : null,
+          pressed ? { opacity: 0.6 } : null,
+        ]}
       >
         {confirmDeleteId === p.id ? (
           <Text style={{ fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.danger }}>Sure?</Text>
         ) : (
-          <Feather name="trash-2" size={16} color={colors.danger} />
+          <Ionicons name="trash" size={17} color={colors.danger} />
         )}
       </Pressable>
     </View>
@@ -109,7 +119,26 @@ export default function ProjectsScreen() {
 
   return (
     <Screen scroll>
-      <ScreenHeader title="Projects" subtitle="Group tasks by context" />
+      <ScreenHeader
+        title="Projects"
+        subtitle="Group tasks by context"
+        action={
+          <Link href="/tags" asChild accessibilityLabel="Open tags">
+            <Pressable
+              accessibilityRole="button"
+              onPress={tapHaptic}
+              style={({ pressed, hovered }) => [
+                styles.headerAction,
+                { borderColor: colors.line },
+                Platform.OS === "web" && hovered ? { backgroundColor: colors.hover } : null,
+                pressed ? { opacity: 0.7 } : null,
+              ]}
+            >
+              <Ionicons name="pricetag" size={20} color={colors.inkSecondary} />
+            </Pressable>
+          </Link>
+        }
+      />
 
       <View style={[styles.newCard, { backgroundColor: colors.surface, borderColor: colors.line }]}>
         <Text style={[styles.sectionLabel, { color: colors.inkSecondary }]}>New project</Text>
@@ -129,7 +158,7 @@ export default function ProjectsScreen() {
               style={({ pressed }) => [
                 styles.swatch,
                 { backgroundColor: c },
-                color === c ? styles.swatchSelected : null,
+                color === c ? [styles.swatchSelected, { borderColor: colors.surface }] : null,
                 pressed ? { opacity: 0.7 } : null,
               ]}
             />
@@ -165,8 +194,16 @@ export default function ProjectsScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   newCard: {
-    borderRadius: 16,
+    borderRadius: radius.lg,
     borderWidth: 1,
     padding: 16,
     gap: 10,
@@ -185,11 +222,10 @@ const styles = StyleSheet.create({
   swatch: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: radius.pill,
   },
   swatchSelected: {
     borderWidth: 3,
-    borderColor: "#FFFFFF",
     shadowColor: "#000",
     shadowOpacity: 0.25,
     shadowRadius: 3,
@@ -209,7 +245,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -217,7 +253,7 @@ const styles = StyleSheet.create({
   dot: {
     width: 12,
     height: 12,
-    borderRadius: 6,
+    borderRadius: radius.pill,
   },
   cardBody: {
     flex: 1,
@@ -226,7 +262,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
   },

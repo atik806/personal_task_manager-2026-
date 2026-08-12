@@ -15,9 +15,9 @@ export function Screen({ children, scroll = false }: ScreenProps) {
   const padTop = Platform.OS === "web" ? 0 : insets.top + 4;
 
   const content = (
-    <View style={styles.content}>
+    <View style={[styles.content, Platform.OS === "web" ? styles.contentWeb : null]}>
       {children}
-      <View style={styles.bottomPad} />
+      <View style={Platform.OS === "web" ? styles.bottomPadWeb : styles.bottomPad} />
     </View>
   );
 
@@ -43,13 +43,20 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: Platform.OS === "web" ? 32 : 16,
     paddingTop: 16,
+  },
+  contentWeb: {
+    paddingHorizontal: 32,
+    paddingTop: 40,
   },
   scrollContent: {
     flexGrow: 1,
   },
   bottomPad: {
+    height: 96,
+  },
+  bottomPadWeb: {
     height: 96,
   },
 });

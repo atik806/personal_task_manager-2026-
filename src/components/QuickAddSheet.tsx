@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../hooks/use-theme";
-import { fonts } from "../lib/theme";
+import { fonts, radius } from "../lib/theme";
 import { describeParsed, parseQuickAdd, type QuickAddResult } from "../lib/parse";
 import { Button } from "./ui/Button";
 import { Sheet } from "./ui/Sheet";
@@ -55,7 +55,7 @@ export function QuickAddSheet({ open, onClose, onCreate }: QuickAddSheetProps) {
         {canAdd ? (
           <View style={[styles.preview, { backgroundColor: colors.accentSoft }]}>
             <View style={styles.previewRow}>
-              <Feather name="type" size={13} color={colors.accent} />
+              <Ionicons name="text" size={14} color={colors.accent} />
               <Text style={[styles.previewTitle, { color: colors.ink, fontFamily: fonts.bodyMedium }]}>
                 {parsed.title}
               </Text>
@@ -77,7 +77,11 @@ export function QuickAddSheet({ open, onClose, onCreate }: QuickAddSheetProps) {
               key={ex}
               accessibilityRole="button"
               onPress={() => setInput(ex)}
-              style={({ pressed }) => (pressed ? { opacity: 0.6 } : null)}
+              style={({ pressed, hovered }) => [
+                styles.exampleRow,
+                Platform.OS === "web" && hovered ? { backgroundColor: colors.hover } : null,
+                pressed ? { opacity: 0.6 } : null,
+              ]}
             >
               <Text style={[styles.example, { color: colors.accent, fontFamily: fonts.mono }]}>{ex}</Text>
             </Pressable>
@@ -94,7 +98,7 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   preview: {
-    borderRadius: 12,
+    borderRadius: radius.md,
     padding: 12,
     gap: 6,
   },
@@ -111,12 +115,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   examples: {
-    gap: 8,
+    gap: 4,
     marginTop: 4,
   },
   examplesLabel: {
     fontFamily: fonts.bodyMedium,
     fontSize: 13,
+    marginBottom: 2,
+  },
+  exampleRow: {
+    borderRadius: radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginHorizontal: -8,
   },
   example: {
     fontSize: 13,

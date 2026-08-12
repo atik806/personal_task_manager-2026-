@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { useDeleteTask, useProjects, useSaveTask, useTags, useTasks, useToggleTask } from "../../lib/query";
 import { taskInsertFromPatch } from "../../lib/task-utils";
 import { addDays, formatLongDate, formatMonthYear, getWeekDates, toISODate } from "../../lib/dates";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 import type { TaskUpdate, TaskWithTags } from "../../lib/types";
 import { Screen } from "../../components/Screen";
 import { ScreenHeader } from "../../components/ScreenHeader";
@@ -17,6 +18,7 @@ import { SegmentedControl } from "../../components/ui/SegmentedControl";
 export default function CalendarScreen() {
   const { colors } = useTheme();
   const { user } = useAuth();
+  const router = useRouter();
   const [mode, setMode] = useState<CalendarMode>("month");
   const [anchor, setAnchor] = useState<Date>(() => {
     const now = new Date();
@@ -73,8 +75,8 @@ export default function CalendarScreen() {
   };
 
   return (
-    <Screen>
-      <ScreenHeader title="Calendar" subtitle={subtitle} />
+    <Screen scroll>
+      <ScreenHeader title="Calendar" subtitle={subtitle} onBack={() => router.back()} />
 
       <View style={styles.controls}>
         <SegmentedControl<CalendarMode>
@@ -90,15 +92,23 @@ export default function CalendarScreen() {
             accessibilityRole="button"
             accessibilityLabel="Previous"
             onPress={goPrev}
-            style={({ pressed }) => [styles.arrowBtn, { borderColor: colors.line }, pressed ? { opacity: 0.6 } : null]}
+            style={({ pressed, hovered }) => [
+              styles.arrowBtn,
+              { borderColor: colors.line, backgroundColor: Platform.OS === "web" && hovered ? colors.hover : "transparent" },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
           >
-            <Feather name="chevron-left" size={18} color={colors.inkSecondary} />
+            <Ionicons name="chevron-back" size={20} color={colors.inkSecondary} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Today"
             onPress={goToday}
-            style={({ pressed }) => [styles.arrowBtn, { borderColor: colors.line }, pressed ? { opacity: 0.6 } : null]}
+            style={({ pressed, hovered }) => [
+              styles.arrowBtn,
+              { borderColor: colors.line, backgroundColor: Platform.OS === "web" && hovered ? colors.hover : "transparent" },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
           >
             <Text style={{ fontFamily: fonts.bodyMedium, fontSize: 12, color: colors.inkSecondary }}>Today</Text>
           </Pressable>
@@ -106,9 +116,13 @@ export default function CalendarScreen() {
             accessibilityRole="button"
             accessibilityLabel="Next"
             onPress={goNext}
-            style={({ pressed }) => [styles.arrowBtn, { borderColor: colors.line }, pressed ? { opacity: 0.6 } : null]}
+            style={({ pressed, hovered }) => [
+              styles.arrowBtn,
+              { borderColor: colors.line, backgroundColor: Platform.OS === "web" && hovered ? colors.hover : "transparent" },
+              pressed ? { opacity: 0.6 } : null,
+            ]}
           >
-            <Feather name="chevron-right" size={18} color={colors.inkSecondary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.inkSecondary} />
           </Pressable>
         </View>
       </View>
@@ -151,7 +165,7 @@ const styles = StyleSheet.create({
   arrowBtn: {
     minHeight: 32,
     minWidth: 36,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

@@ -3,13 +3,15 @@ import {
   AccessibilityInfo,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
 import { elevation, fonts, radius } from "../../lib/theme";
 
@@ -35,12 +37,32 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
   const isWide = Platform.OS === "web" && Dimensions.get("window").width >= WEB_BREAKPOINT;
 
   const [translate] = useState(() => new Animated.Value(isWide ? 420 : 600));
+  const [panY] = useState(() => new Animated.Value(0));
   const [backdrop] = useState(() => new Animated.Value(0));
   const reducedMotion = useRef(false);
+  const startY = useRef(0);
+  const lastMoveY = useRef(0);
+  const lastMoveTime = useRef(0);
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((v) => (reducedMotion.current = v));
   }, []);
+
+  const snapBack = () => {
+    Animated.spring(panY, { toValue: 0, useNativeDriver: true, bounciness: 4, speed: 20 }).start();
+  };
+
+  const handleRelease = (dy: number, vy: number) => {
+    if (dy > 100 || vy > 0.8) {
+      const duration = reducedMotion.current ? 0 : 200;
+      Animated.parallel([
+        Animated.timing(translate, { toValue: 600, duration, useNativeDriver: true }),
+        Animated.timing(panY, { toValue: 0, duration, useNativeDriver: true }),
+      ]).start(() => onClose());
+    } else {
+      snapBack();
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -49,9 +71,10 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
       Animated.timing(backdrop, { toValue: 1, duration, useNativeDriver: true }).start();
     } else {
       translate.setValue(isWide ? 420 : 600);
+      panY.setValue(0);
       backdrop.setValue(0);
     }
-  }, [open, translate, backdrop, isWide]);
+  }, [open, translate, panY, backdrop, isWide]);
 
   if (!open) return null;
 
@@ -73,12 +96,41 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
         style={[
           isWide ? styles.panelRight : styles.panelBottom,
           isWide ? { width: panelWidth } : null,
-          { transform: [{ translateY: isWide ? 0 : translate }, { translateX: isWide ? translate : 0 }] },
+          {
+            transform: [
+              { translateY: isWide ? 0 : Animated.add(translate, panY) },
+              { translateX: isWide ? translate : 0 },
+            ],
+          },
           { backgroundColor: colors.surface, borderColor: colors.line },
-          isWide ? { ...elevation(colors, "lg") } : null,
+          { ...elevation(colors, "lg") },
         ]}
       >
-        <View style={styles.grabberContainer}>
+        <View
+          style={styles.grabberContainer}
+          {...(Platform.OS !== "web"
+            ? {
+                onStartShouldSetResponder: (evt: GestureResponderEvent) => {
+                  startY.current = evt.nativeEvent.pageY;
+                  lastMoveY.current = evt.nativeEvent.pageY;
+                  lastMoveTime.current = Date.now();
+                  return true;
+                },
+                onResponderMove: (evt: GestureResponderEvent) => {
+                  panY.setValue(Math.max(0, evt.nativeEvent.pageY - startY.current));
+                  lastMoveY.current = evt.nativeEvent.pageY;
+                  lastMoveTime.current = Date.now();
+                },
+                onResponderRelease: (evt: GestureResponderEvent) => {
+                  const dy = evt.nativeEvent.pageY - startY.current;
+                  const dt = Date.now() - lastMoveTime.current;
+                  const vy = dt > 0 ? (evt.nativeEvent.pageY - lastMoveY.current) / dt : 0;
+                  handleRelease(dy, vy);
+                },
+                onResponderTerminate: () => snapBack(),
+              }
+            : null)}
+        >
           <View style={[styles.grabber, { backgroundColor: colors.lineStrong }]} />
         </View>
         {(title || subtitle || showCloseButton) && (
@@ -101,12 +153,23 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
                 accessibilityLabel="Close"
                 style={({ pressed }) => [styles.closeBtn, { borderColor: colors.line }, pressed ? { backgroundColor: colors.hover } : null]}
               >
-                <Feather name="x" size={18} color={colors.inkSecondary} />
+                <Ionicons name="close" size={20} color={colors.inkSecondary} />
               </Pressable>
             ) : null}
           </View>
         )}
-        <View style={styles.body}>{children}</View>
+        <View style={styles.body}>
+          {Platform.OS === "web" ? (
+            children
+          ) : (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              style={styles.kav}
+            >
+              {children}
+            </KeyboardAvoidingView>
+          )}
+        </View>
       </Animated.View>
     </View>
   );
@@ -130,12 +193,15 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     borderTopWidth: 1,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
+    borderTopLeftRadius: Platform.OS === "web" ? radius.xl : 24,
+    borderTopRightRadius: Platform.OS === "web" ? radius.xl : 24,
     paddingTop: 8,
     paddingHorizontal: 16,
     paddingBottom: 24,
     maxHeight: "90%",
+  },
+  kav: {
+    flex: 1,
   },
   grabberContainer: {
     alignItems: "center",
@@ -169,7 +235,7 @@ const styles = StyleSheet.create({
   closeBtn: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: radius.pill,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",

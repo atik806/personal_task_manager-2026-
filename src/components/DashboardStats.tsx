@@ -1,8 +1,8 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../hooks/use-theme";
-import { elevation, fonts } from "../lib/theme";
+import { elevation, fonts, radius } from "../lib/theme";
 import { completionsByWeekday, currentStreak, isBeforeToday, todayKey, toISODate } from "../lib/dates";
 import type { TaskWithTags } from "../lib/types";
 
@@ -31,15 +31,15 @@ export function DashboardStats({ tasks }: DashboardStatsProps) {
   }, [tasks]);
 
   const items: {
-    icon: keyof typeof Feather.glyphMap;
+    icon: keyof typeof Ionicons.glyphMap;
     label: string;
     value: string;
     tint: string;
     soft: string;
   }[] = [
-    { icon: "check-circle", label: "Done this week", value: String(stats.completedThisWeek), tint: colors.success, soft: colors.successSoft },
-    { icon: "zap", label: "Streak", value: `${stats.streak}d`, tint: colors.accent, soft: colors.accentSoft },
-    { icon: "clock", label: "Overdue", value: String(stats.overdue), tint: colors.danger, soft: colors.dangerSoft },
+    { icon: "checkmark-circle", label: "Done this week", value: String(stats.completedThisWeek), tint: colors.success, soft: colors.successSoft },
+    { icon: "flash", label: "Streak", value: `${stats.streak}d`, tint: colors.accent, soft: colors.accentSoft },
+    { icon: "time", label: "Overdue", value: String(stats.overdue), tint: colors.danger, soft: colors.dangerSoft },
     { icon: "calendar", label: "Upcoming", value: String(stats.upcoming), tint: colors.inkSecondary, soft: colors.chipBg },
   ];
 
@@ -55,7 +55,7 @@ export function DashboardStats({ tasks }: DashboardStatsProps) {
           ]}
         >
           <View style={[styles.iconChip, { backgroundColor: it.soft }]}>
-            <Feather name={it.icon} size={15} color={it.tint} />
+            <Ionicons name={it.icon} size={16} color={it.tint} />
           </View>
           <View style={styles.textWrap}>
             <Text style={[styles.value, { color: colors.ink, fontFamily: fonts.displayBold }]}>{it.value}</Text>
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: 14,
+    borderRadius: radius.lg,
     borderWidth: 1,
     paddingVertical: 12,
     paddingHorizontal: 12,
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   iconChip: {
     width: 34,
     height: 34,
-    borderRadius: 10,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },

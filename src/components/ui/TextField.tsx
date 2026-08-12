@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Text, TextInput, View, type TextInputProps, type TextStyle, type ViewStyle } from "react-native";
 import { useTheme } from "../../hooks/use-theme";
-import { fonts } from "../../lib/theme";
+import { fonts, radius } from "../../lib/theme";
 
 interface TextFieldProps extends Omit<TextInputProps, "style"> {
   label?: string;
@@ -36,7 +36,7 @@ export function TextField({ label, error, hint, inputStyle, style, ...inputProps
         onBlur={() => setFocused(false)}
         style={{
           minHeight: 44,
-          borderRadius: 10,
+          borderRadius: radius.md,
           borderWidth: 1,
           borderColor: error ? colors.danger : focused ? colors.accent : colors.line,
           backgroundColor: colors.fieldBg,
@@ -44,11 +44,12 @@ export function TextField({ label, error, hint, inputStyle, style, ...inputProps
           color: colors.ink,
           fontFamily: fonts.body,
           fontSize: 15,
+          outlineWidth: 0,
           ...(focused && !error
             ? {
                 shadowColor: colors.accent,
-                shadowOpacity: 0.18,
-                shadowRadius: 4,
+                shadowOpacity: 0.22,
+                shadowRadius: 5,
                 shadowOffset: { width: 0, height: 0 },
                 elevation: 2,
               }
