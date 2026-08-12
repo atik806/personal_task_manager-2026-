@@ -51,6 +51,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2b34e0ef-e9ef-4b3f-aa70-f23db5aeec5f"
+      }
+    },
+    "owner": "atik21"
   }
 }
