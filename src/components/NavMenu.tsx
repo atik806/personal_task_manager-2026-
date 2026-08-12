@@ -1,33 +1,104 @@
 import React, { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { usePathname, useRouter, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/use-theme";
 import { elevation, fonts, glow, radius } from "../lib/theme";
+import { NAV_ITEMS } from "../lib/navigation";
 import { tapHaptic } from "../lib/haptics";
-
-const ITEMS: { href: Href; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { href: "/", label: "Today", icon: "sunny-outline" },
-  { href: "/upcoming", label: "Upcoming", icon: "calendar-outline" },
-  { href: "/projects", label: "Projects", icon: "folder-outline" },
-  { href: "/tags", label: "Tags", icon: "pricetag-outline" },
-  { href: "/search", label: "Search", icon: "search-outline" },
-];
+import { useSheetVisibility } from "./SheetVisibilityProvider";
 
 /** Web-only background-color transition for hover/press polish. */
 const BG_TRANSITION = {
   transition: "background-color 0.15s ease",
 } as unknown as ViewStyle;
 
-/** Floating bottom-left nav menu: FAB toggle that opens the app's destinations. */
-export function NavMenu() {
+interface NavMenuPanelProps {
+  /** Position overrides for the dropdown (the caller anchors it to its trigger). */
+  style?: StyleProp<ViewStyle>;
+  /** Called after a destination is chosen so the caller can close its menu. */
+  onNavigate?: () => void;
+}
+
+/** Shared destinations dropdown — highlights the active route, navigates on press. */
+export function NavMenuPanel({ style, onNavigate }: NavMenuPanelProps) {
   const { colors } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
+
+  const go = (href: Href) => {
+    tapHaptic();
+    onNavigate?.();
+    router.push(href);
+  };
+
+  return (
+    <View
+      style={[
+        styles.panel,
+        { backgroundColor: colors.surfaceElevated, borderColor: colors.lineStrong },
+        elevation(colors, "lg"),
+        style,
+      ]}
+    >
+      {NAV_ITEMS.map((item) => {
+        const active = pathname === String(item.href);
+        return (
+          <Pressable
+            key={item.label}
+            accessibilityRole="button"
+            accessibilityLabel={item.label}
+            accessibilityState={{ selected: active }}
+            onPress={() => go(item.href)}
+            style={({ pressed, hovered }) => [
+              styles.item,
+              active
+                ? { backgroundColor: colors.accentSoft }
+                : Platform.OS === "web" && hovered
+                  ? { backgroundColor: colors.hover }
+                  : null,
+              pressed ? { opacity: 0.85 } : null,
+              Platform.OS === "web" ? BG_TRANSITION : null,
+            ]}
+          >
+            <Ionicons
+              name={item.icon}
+              size={20}
+              color={active ? colors.accent : colors.inkSecondary}
+            />
+            <Text
+              numberOfLines={1}
+              style={{
+                fontFamily: fonts.bodyMedium,
+                fontSize: 14,
+                color: active ? colors.accent : colors.ink,
+              }}
+            >
+              {item.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Floating bottom-left nav menu (mobile only): FAB toggle that opens destinations. */
+export function NavMenu() {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+  const { isSheetOpen } = useSheetVisibility();
 
   const web = Platform.OS === "web";
 
@@ -42,15 +113,17 @@ export function NavMenu() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // On web the destinations menu lives in the top navbar, so the FAB is
+  // redundant there.
+  if (web) return null;
+
+  // Hide the whole menu (FAB + open panel) while any sheet is open so it never
+  // overlaps the sheet's footer actions.
+  if (isSheetOpen) return null;
+
   const toggle = () => {
     tapHaptic();
     setOpen((v) => !v);
-  };
-
-  const go = (href: Href) => {
-    tapHaptic();
-    setOpen(false);
-    router.push(href);
   };
 
   return (
@@ -63,57 +136,10 @@ export function NavMenu() {
             onPress={() => setOpen(false)}
             style={styles.backdrop}
           />
-          <View
-            style={[
-              styles.panel,
-              {
-                left: web ? 24 : 20,
-                bottom: web ? 82 : 158 + insets.bottom,
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.lineStrong,
-              },
-              elevation(colors, "lg"),
-            ]}
-          >
-            {ITEMS.map((item) => {
-              const active = pathname === String(item.href);
-              return (
-                <Pressable
-                  key={item.label}
-                  accessibilityRole="button"
-                  accessibilityLabel={item.label}
-                  accessibilityState={{ selected: active }}
-                  onPress={() => go(item.href)}
-                  style={({ pressed, hovered }) => [
-                    styles.item,
-                    active
-                      ? { backgroundColor: colors.accentSoft }
-                      : web && hovered
-                        ? { backgroundColor: colors.hover }
-                        : null,
-                    pressed ? { opacity: 0.85 } : null,
-                    web ? BG_TRANSITION : null,
-                  ]}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={20}
-                    color={active ? colors.accent : colors.inkSecondary}
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontFamily: fonts.bodyMedium,
-                      fontSize: 14,
-                      color: active ? colors.accent : colors.ink,
-                    }}
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <NavMenuPanel
+            style={{ left: 20, bottom: 158 + insets.bottom }}
+            onNavigate={() => setOpen(false)}
+          />
         </>
       ) : null}
 
@@ -123,22 +149,19 @@ export function NavMenu() {
         accessibilityState={{ expanded: open }}
         onPress={toggle}
         style={({ pressed, hovered }) => [
-          web ? styles.fabWeb : styles.fab,
-          { bottom: web ? 24 : 88 + insets.bottom, ...glow(colors, "strong") },
-          web && hovered && !pressed ? styles.fabWebLift : null,
-          pressed ? { opacity: 0.85, transform: [{ scale: web ? 0.96 : 0.92 }] } : null,
+          styles.fab,
+          { bottom: 88 + insets.bottom, ...glow(colors, "strong") },
+          hovered && !pressed ? styles.fabLift : null,
+          pressed ? { opacity: 0.85, transform: [{ scale: 0.92 }] } : null,
         ]}
       >
         <LinearGradient
           colors={colors.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={web ? styles.fabWebGradient : styles.fabGradient}
+          style={styles.fabGradient}
         >
-          <Ionicons name="grid-outline" size={web ? 20 : 24} color={colors.onAccent} />
-          {web ? (
-            <Text style={[styles.fabLabel, { color: colors.onAccent }]}>Menu</Text>
-          ) : null}
+          <Ionicons name="grid-outline" size={24} color={colors.onAccent} />
         </LinearGradient>
       </Pressable>
     </View>
@@ -148,10 +171,7 @@ export function NavMenu() {
 const styles = StyleSheet.create({
   // Full-screen hit-test container that is never a touch target itself (see
   // pointerEvents="box-none"), so the panel's backdrop can span the whole app
-  // from a corner-anchored FAB. RNW gives every View position:relative +
-  // z-index:0 (its own stacking context), so the container must be lifted
-  // above the earlier route-content sibling while the menu is open — the same
-  // trick TopNavbar uses with barRaised.
+  // from a corner-anchored FAB.
   container: {
     ...StyleSheet.absoluteFill,
   },
@@ -187,25 +207,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  fabWeb: {
-    position: "absolute",
-    left: 24,
-    borderRadius: radius.pill,
-    overflow: "hidden",
-  },
-  fabWebGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 13,
-  },
-  fabLabel: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
-  },
-  fabWebLift: {
+  fabLift: {
     transform: [{ translateY: -2 }],
   },
   item: {

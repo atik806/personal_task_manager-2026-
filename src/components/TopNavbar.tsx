@@ -7,6 +7,7 @@ import { useTheme } from "../hooks/use-theme";
 import { useAuth } from "../hooks/use-auth";
 import { profileMenuReducer } from "../lib/profile-menu";
 import { elevation, fonts, radius } from "../lib/theme";
+import { NavMenuPanel } from "./NavMenu";
 
 /** Below this width the bar uses tighter spacing (labels always stay visible). */
 const COMPACT_BREAKPOINT = 820;
@@ -96,16 +97,18 @@ function MenuItem({ icon, label, danger, trailing, onPress }: MenuItemProps) {
   );
 }
 
-/** Web top navbar: profile menu pinned to the right edge. */
+/** Web top navbar: nav menu pinned to the left edge, profile menu to the right. */
 export function TopNavbar() {
   const { colors, isDark, toggle } = useTheme();
   const { user, signOut } = useAuth();
 
   const [menuOpen, dispatchMenu] = useReducer(profileMenuReducer, "closed");
+  const [navOpen, setNavOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(1200);
   const wrapRef = useRef<View>(null);
   const router = useRouter();
   const hoverProfile = useHover();
+  const hoverNav = useHover();
 
   const email = user?.email ?? "";
   const displayName = String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? "");
@@ -121,17 +124,20 @@ export function TopNavbar() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Close the menu on Escape while it's open. Outside clicks close via the
-  // full-screen backdrop below (a window "pointerdown"/"click" listener would
-  // race the same click that opened the menu and is unnecessary here).
+  // Close the open dropdown(s) on Escape while any is open. Outside clicks
+  // close via the full-screen backdrops below (a window "pointerdown"/"click"
+  // listener would race the same click that opened the menu and is unnecessary).
   useEffect(() => {
-    if (menuOpen !== "open" || typeof window === "undefined") return;
+    if ((menuOpen !== "open" && !navOpen) || typeof window === "undefined") return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") dispatchMenu({ type: "close" });
+      if (e.key === "Escape") {
+        dispatchMenu({ type: "close" });
+        setNavOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [menuOpen]);
+  }, [menuOpen, navOpen]);
 
   if (Platform.OS !== "web") return null;
 
@@ -140,16 +146,62 @@ export function TopNavbar() {
       style={[
         styles.bar,
         compact ? styles.barCompact : null,
-        menuOpen === "open" ? styles.barRaised : null,
+        menuOpen === "open" || navOpen ? styles.barRaised : null,
         { backgroundColor: colors.surface, borderBottomColor: colors.line },
       ]}
     >
+      <View style={styles.navWrap}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open navigation menu"
+          accessibilityState={{ expanded: navOpen }}
+          onPress={() => {
+            dispatchMenu({ type: "close" });
+            setNavOpen((v) => !v);
+          }}
+          onHoverIn={hoverNav.onHoverIn}
+          onHoverOut={hoverNav.onHoverOut}
+          style={({ pressed }) => [
+            styles.navBtn,
+            { borderColor: colors.line },
+            navOpen || hoverNav.hovered ? { backgroundColor: colors.hover } : null,
+            pressed ? styles.pressed : null,
+            Platform.OS === "web" ? BG_TRANSITION : null,
+          ]}
+        >
+          <Ionicons
+            name={navOpen ? "close" : "grid-outline"}
+            size={20}
+            color={navOpen ? colors.accent : colors.ink}
+          />
+          {hoverNav.hovered && !navOpen ? <Tooltip label="Menu" /> : null}
+        </Pressable>
+
+        {navOpen ? (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close menu"
+              onPress={() => setNavOpen(false)}
+              style={styles.menuBackdrop}
+            />
+            <NavMenuPanel
+              style={{ top: 62, left: 0 }}
+              onNavigate={() => setNavOpen(false)}
+            />
+          </>
+        ) : null}
+      </View>
+
       <View style={styles.profileWrap} ref={wrapRef}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Account menu"
           accessibilityState={{ expanded: menuOpen === "open" }}
-          onPress={() => dispatchMenu({ type: "toggle" })}
+          onPress={() => {
+            setNavOpen(false);
+            dispatchMenu({ type: "toggle" });
+          }}
           onHoverIn={hoverProfile.onHoverIn}
           onHoverOut={hoverProfile.onHoverOut}          style={({ pressed }) => [
             styles.profileBtn,
@@ -266,7 +318,7 @@ const styles = StyleSheet.create({
     height: 68,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingHorizontal: 24,
     gap: 12,
     borderBottomWidth: 1,
@@ -281,6 +333,18 @@ const styles = StyleSheet.create({
   // the bar while the menu is open puts the whole bar + dropdown above content.
   barRaised: {
     zIndex: 40,
+  },
+  navWrap: {
+    position: "relative",
+  },
+  navBtn: {
+    width: 46,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    position: "relative",
   },
   profileWrap: {
     position: "relative",
