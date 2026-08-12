@@ -84,7 +84,7 @@ export function ReminderSync() {
 /** Stable signature of the fields that affect the reminder schedule. */
 function scheduleSignature(tasks: TaskWithTags[]): string {
   return tasks
-    .map((t) => [t.id, t.status, t.due_date ?? "", t.due_time ?? ""].join("|"))
+    .map((t) => [t.id, t.status, t.due_date ?? "", t.due_time ?? "", t.title].join("|"))
     .sort()
     .join("\n");
 }
