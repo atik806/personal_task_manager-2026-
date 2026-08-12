@@ -80,7 +80,11 @@ export async function fetchTasks(userId: string): Promise<TaskWithTags[]> {
 }
 
 export async function insertTask(input: TaskInsert, tagIds: string[] = []): Promise<TaskWithTags> {
-  const { data, error } = await supabase.from("tasks").insert(input).select("*").single();
+  // Defense-in-depth: normalize due_time on the write path so "HH:MM:SS"
+  // never reaches the DB (Postgres time columns would round-trip seconds).
+  const normalized =
+    input.due_time != null ? { ...input, due_time: normalizeTime(input.due_time) } : input;
+  const { data, error } = await supabase.from("tasks").insert(normalized).select("*").single();
   if (error) throw error;
   if (tagIds.length) {
     const { error: linkError } = await supabase.from("task_tags").insert(
@@ -96,7 +100,11 @@ export async function updateTask(
   patch: TaskUpdate,
   tagIds?: string[]
 ): Promise<void> {
-  const { error } = await supabase.from("tasks").update(patch).eq("id", id);
+  // Normalize due_time on the write path (see insertTask above). Null stays
+  // null so callers can still clear a time.
+  const normalized =
+    patch.due_time != null ? { ...patch, due_time: normalizeTime(patch.due_time) } : patch;
+  const { error } = await supabase.from("tasks").update(normalized).eq("id", id);
   if (error) throw error;
   if (tagIds !== undefined) {
     // Use atomic RPC to replace tags (avoids non-transactional delete-then-insert)
@@ -115,22 +123,51 @@ export async function deleteTask(id: string): Promise<void> {
 
 export async function toggleTaskCompleted(task: TaskRow): Promise<void> {
   const completing = task.status !== "done";
-  await updateTask(task.id, {
+  const patch: TaskUpdate = {
     status: completing ? "done" : "todo",
     completed_at: completing ? new Date().toISOString() : null,
-  });
+  };
+
+  // Server clock: read back the DB's updated_at so completed_at can be
+  // reconciled to the server timestamp instead of the device clock.
+  const { data, error } = await supabase
+    .from("tasks")
+    .update(patch)
+    .eq("id", task.id)
+    .select("updated_at");
+  if (error) throw error;
+
+  const serverUpdatedAt = (data && data[0]?.updated_at) as string | undefined;
+  if (completing && serverUpdatedAt) {
+    // Overwrite the device-clock guess with the authoritative server time.
+    const { error: clockError } = await supabase
+      .from("tasks")
+      .update({ completed_at: serverUpdatedAt })
+      .eq("id", task.id);
+    if (clockError) throw clockError;
+  }
 
   // If completing a recurring task, generate the next occurrence
   if (completing && task.recurrence_rule) {
     const nextTask = buildRecurringTask(task);
     if (nextTask) {
-      // We need to get the tag IDs from the completed task to copy them
-      const { data: taskTags } = await supabase
-        .from("task_tags")
-        .select("tag_id")
-        .eq("task_id", task.id);
-      const tagIds = (taskTags ?? []).map((tt) => tt.tag_id);
-      await insertTask(nextTask, tagIds);
+      // Idempotency guard for mutation retries: skip if a next occurrence for
+      // this parent + due date already exists (avoids duplicate rows).
+      const { data: existing, error: existsError } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("parent_task_id", task.id)
+        .eq("due_date", nextTask.due_date);
+      if (existsError) throw existsError;
+      if (!existing || existing.length === 0) {
+        // We need to get the tag IDs from the completed task to copy them
+        const { data: taskTags } = await supabase
+          .from("task_tags")
+          .select("tag_id")
+          .eq("task_id", task.id);
+        const tagIds = (taskTags ?? []).map((tt) => tt.tag_id);
+        await insertTask(nextTask, tagIds);
+      }
     }
   }
 }

@@ -5,7 +5,7 @@
 
 import type { TaskInsert, TaskRow, TaskUpdate } from "./types";
 import { computeNextOccurrence } from "./recurrence";
-import { today, toISODate } from "./dates";
+import { fromISODate, today, toISODate } from "./dates";
 
 /**
  * Merge a partial `TaskUpdate` over a current task, producing the full
@@ -56,7 +56,9 @@ export function buildRecurringTask(task: TaskRow): TaskInsert | null {
   let anchor: Date;
 
   if (task.due_date) {
-    const dueDate = new Date(task.due_date + "T00:00:00");
+    // Local-midnight parse via the shared helper so the anchor day always
+    // matches the due_date (and stays consistent with the rest of the app).
+    const dueDate = fromISODate(task.due_date);
     // Use due_date as anchor if it's not in the past, otherwise use today
     if (dueDate >= todayDate) {
       anchor = dueDate;

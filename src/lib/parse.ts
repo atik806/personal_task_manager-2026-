@@ -136,9 +136,14 @@ function extractProject(input: string): { rest: string; project: string | null }
   return { rest, project };
 }
 
-/** Extract a due time ("5pm", "17:30", "noon") with an optional "at". */
+/** Extract a due time ("5pm", "17:30", "17:30:00", "noon") with an optional "at". */
 function extractTime(input: string): { rest: string; time: string | null } {
-  const m = input.match(/\b(?:at\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2}|noon|midnight)\b/i);
+  // Two optional ":SS" groups so "17:30:00" is fully consumed (not left as
+  // ":00" in the title); parseTime drops the seconds → "17:30". The second
+  // alternative needs at least one ":SS" so bare numbers like "3" stay text.
+  const m = input.match(
+    /\b(?:at\s+)?(\d{1,2}(?::\d{2}){0,2}\s*(?:am|pm)|\d{1,2}(?::\d{2}){1,2}|noon|midnight)\b/i
+  );
   if (!m) return { rest: input, time: null };
   const parsed = parseTime(m[1]);
   if (!parsed) return { rest: input, time: null };
