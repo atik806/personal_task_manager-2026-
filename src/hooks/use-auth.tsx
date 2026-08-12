@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { onAuthChange, signOut as supabaseSignOut, supabase } from "../lib/supabase";
 import { isReminderSupported } from "../lib/notifications";
+import { QUERY_CACHE_STORAGE_KEY, queryClient } from "../lib/query-client";
 
 interface AuthContextValue {
   session: Session | null;
@@ -47,6 +49,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabaseSignOut();
     setSession(null);
+    // Privacy on shared devices: drop the previous user's query cache (tasks /
+    // tags / projects) from memory AND from the AsyncStorage-persisted copy so
+    // it can't leak to the next user or survive a restart.
+    queryClient.clear();
+    try {
+      await AsyncStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
+    } catch {
+      // non-fatal — the in-memory clear above is the important part
+    }
     // Don't keep firing reminders for a signed-out user's tasks.
     if (isReminderSupported) {
       Notifications.cancelAllScheduledNotificationsAsync().catch(() => {});

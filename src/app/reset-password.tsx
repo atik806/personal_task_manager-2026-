@@ -5,31 +5,11 @@ import * as Linking from "expo-linking";
 import { useTheme } from "../hooks/use-theme";
 import { useAuth } from "../hooks/use-auth";
 import { resetPassword, updatePassword, supabase } from "../lib/supabase";
+import { parseRecoveryUrl } from "../lib/recovery";
 import { fonts } from "../lib/theme";
 import { AuthLayout } from "../components/AuthLayout";
 import { Button } from "../components/ui/Button";
 import { TextField } from "../components/ui/TextField";
-
-interface RecoveryTokens {
-  access_token: string;
-  refresh_token: string;
-}
-
-/** Parse a Supabase recovery link ("#access_token=…&refresh_token=…&type=recovery"). */
-function parseRecoveryUrl(url: string): RecoveryTokens | null {
-  if (!url) return null;
-  const hash = url.includes("#") ? url.split("#")[1] : "";
-  const fields = Object.fromEntries(
-    hash.split("&").map((pair) => {
-      const eq = pair.indexOf("=");
-      return eq === -1 ? [pair, ""] : [pair.slice(0, eq), decodeURIComponent(pair.slice(eq + 1))];
-    })
-  );
-  if (fields.access_token && fields.refresh_token) {
-    return { access_token: fields.access_token, refresh_token: fields.refresh_token };
-  }
-  return null;
-}
 
 export default function ResetPasswordScreen() {
   const { colors } = useTheme();

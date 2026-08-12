@@ -34,9 +34,10 @@ onlineManager.setEventListener((setOnline) => {
 
 // Persist the query cache to disk so the app is truly usable offline across
 // restarts (not just within a single session).
+export const QUERY_CACHE_STORAGE_KEY = "daymark.query-cache";
 export const queryPersister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: "daymark.query-cache",
+  key: QUERY_CACHE_STORAGE_KEY,
   throttleTime: 1000,
 });
 
