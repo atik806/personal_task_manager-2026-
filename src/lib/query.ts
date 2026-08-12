@@ -11,6 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { queryClient } from "./query-client";
 import {
   deleteProject,
   deleteTag,
@@ -69,6 +70,15 @@ export function useTags(userId: string | undefined) {
   });
 }
 
+/**
+ * Invalidate the tags cache for a user. Used after ensureTag creates a row
+ * outside the useCreateTag mutation (e.g. the quick-add flow) so the Tags
+ * screen doesn't stay stale until the 30s staleTime expires.
+ */
+export function invalidateTags(userId: string): void {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.tags(userId) });
+}
+
 function optimisticTaskUpdate(
   client: ReturnType<typeof useQueryClient>,
   userId: string,
@@ -80,24 +90,40 @@ function optimisticTaskUpdate(
   );
 }
 
+/** Task ids currently mid-toggle; guards against double-taps enqueueing two toggles. */
+const inFlightToggles = new Map<string, boolean>();
+
 export function useToggleTask(userId: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (task: TaskRow) => toggleTaskCompleted(task),
     networkMode: "offlineFirst",
     onMutate: async (task) => {
-      await client.cancelQueries({ queryKey: queryKeys.tasks(userId) });
-      const completing = task.status !== "done";
-      optimisticTaskUpdate(client, userId, task.id, {
-        status: completing ? "done" : "todo",
-        completed_at: completing ? new Date().toISOString() : null,
-      });
-      return { previous: client.getQueryData(queryKeys.tasks(userId)) };
+      // In-flight guard: ignore a second tap on the same task while the first
+      // is still settling. The optimistic completed_at below is only a
+      // transient guess; the server reconcile in toggleTaskCompleted fixes it.
+      if (inFlightToggles.get(task.id)) {
+        throw new Error("toggle already in flight");
+      }
+      inFlightToggles.set(task.id, true);
+      try {
+        await client.cancelQueries({ queryKey: queryKeys.tasks(userId) });
+        const completing = task.status !== "done";
+        optimisticTaskUpdate(client, userId, task.id, {
+          status: completing ? "done" : "todo",
+          completed_at: completing ? new Date().toISOString() : null,
+        });
+        return { previous: client.getQueryData(queryKeys.tasks(userId)) };
+      } catch (e) {
+        inFlightToggles.delete(task.id);
+        throw e;
+      }
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.previous) client.setQueryData(queryKeys.tasks(userId), ctx.previous);
     },
-    onSettled: () => {
+    onSettled: (_d, _e, task) => {
+      inFlightToggles.delete(task.id);
       client.invalidateQueries({ queryKey: queryKeys.tasks(userId) });
     },
   });
