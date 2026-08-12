@@ -102,7 +102,8 @@ src/
     theme.ts        design tokens, fonts, light/dark palettes
     types.ts        shared TypeScript types
 supabase/
-  migrations/     0001_init.sql, 0002_fixes.sql, 0003_rls_hardening.sql
+  migrations/     0001_init.sql (consolidated — replaces the former
+                  0001_init.sql + 0002_fixes.sql + 0003_rls_hardening.sql)
   functions/      generate-recurring, dispatch-reminders (optional stubs)
 ```
 
