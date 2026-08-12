@@ -8,7 +8,7 @@ import type { ProjectRow, TaskWithTags } from "../lib/types";
 import { elevation, fonts, radius } from "../lib/theme";
 import { completeHaptic, deleteHaptic } from "../lib/haptics";
 import { Checkbox } from "./ui/Checkbox";
-import { SpineNode, type SpineNodeColor } from "./DaySpine";
+import { spineColor, type SpineNodeColor } from "./DaySpine";
 
 export function taskSpineKind(task: Pick<TaskWithTags, "status" | "due_date">): SpineNodeColor {
   if (task.status === "done") return "done";
@@ -96,13 +96,18 @@ export function TaskItem({
                 },
               ]
             : null,
-          done ? { backgroundColor: colors.successSoft } : null,
+          done ? { backgroundColor: colors.accentSoft } : null,
           (pressed || (Platform.OS === "web" && hovered)) && !done
             ? { backgroundColor: card ? colors.accentSoft : colors.hover }
             : null,
         ]}
       >
-        <SpineNode kind={taskSpineKind(task)} />
+        <View
+          style={[
+            styles.statusDot,
+            { backgroundColor: spineColor(taskSpineKind(task), colors) },
+          ]}
+        />
         <View style={styles.content}>
           <Text
             numberOfLines={2}
@@ -175,7 +180,6 @@ export function TaskItem({
         </View>
         <Checkbox
           checked={done}
-          successColor={!card}
           onPress={handleToggle}
           accessibilityLabel={done ? `Mark ${task.title} as not done` : `Complete ${task.title}`}
         />
@@ -210,7 +214,7 @@ export function TaskItem({
       onPress={handleComplete}
       style={({ pressed }) => [
         styles.completeAction,
-        { backgroundColor: colors.success },
+        { backgroundColor: colors.accent },
         pressed ? { opacity: 0.8 } : null,
       ]}
     >
@@ -238,6 +242,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     minHeight: 56,
+    gap: 10,
+    paddingLeft: 8,
     paddingRight: 12,
     borderRadius: radius.md,
   },
@@ -248,8 +254,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     paddingHorizontal: 14,
   },
+  // Small leading status marker, vertically centered with the task text so
+  // each row reads as: dot + label/time + single checkbox.
+  statusDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    flexShrink: 0,
+  },
   content: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: 10,
     gap: 4,
   },

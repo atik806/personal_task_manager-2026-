@@ -7,6 +7,11 @@ import { useTheme } from "../hooks/use-theme";
 import { fonts, radius } from "../lib/theme";
 import { tapHaptic } from "../lib/haptics";
 
+/**
+ * Primary mobile navigation. All six destinations get an equal flex column so
+ * labels never collide: every tab is one fixed-width column containing a
+ * centered icon + label, with the active tab highlighted by an accent pill.
+ */
 const TABS: {
   href: Href;
   label: string;
@@ -16,6 +21,8 @@ const TABS: {
   { href: "/", label: "Today", iconActive: "sunny", iconInactive: "sunny-outline" },
   { href: "/upcoming", label: "Upcoming", iconActive: "calendar", iconInactive: "calendar-outline" },
   { href: "/projects", label: "Projects", iconActive: "folder", iconInactive: "folder-outline" },
+  { href: "/tags", label: "Tags", iconActive: "pricetag", iconInactive: "pricetag-outline" },
+  { href: "/search", label: "Search", iconActive: "search", iconInactive: "search-outline" },
   { href: "/settings", label: "Settings", iconActive: "settings", iconInactive: "settings-outline" },
 ];
 
@@ -60,20 +67,22 @@ export function BottomTabBar() {
               >
                 <Ionicons
                   name={active ? tab.iconActive : tab.iconInactive}
-                  size={24}
+                  size={22}
                   color={active ? colors.accent : colors.inkSecondary}
                 />
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.label,
+                    {
+                      fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
+                      color: active ? colors.accent : colors.inkSecondary,
+                    },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
               </View>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
-                  fontSize: 11,
-                  color: active ? colors.accent : colors.inkSecondary,
-                }}
-              >
-                {tab.label}
-              </Text>
             </Pressable>
           </Link>
         );
@@ -90,17 +99,25 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
-    minHeight: 56,
+    height: 58,
   },
   pill: {
-    minWidth: 48,
-    height: 28,
-    borderRadius: radius.pill,
+    minWidth: 0,
+    maxWidth: "100%",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 12,
+    gap: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: radius.lg,
+  },
+  label: {
+    fontSize: 10,
+    textAlign: "center",
+    maxWidth: "100%",
   },
 });

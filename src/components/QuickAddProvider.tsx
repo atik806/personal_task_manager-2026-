@@ -123,7 +123,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
           }}
           style={({ pressed }) => [
             styles.fab,
-            { bottom: 88 + insets.bottom, ...glow(colors, "strong") },
+            { bottom: 96 + insets.bottom, ...glow(colors, "strong") },
             pressed ? { opacity: 0.85, transform: [{ scale: 0.92 }] } : null,
           ]}
         >
@@ -150,6 +150,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
+    // Keeps the FAB clear of the bottom tab bar in the sibling order.
+    zIndex: 50,
   },
   fabGradient: {
     width: 58,

@@ -7,20 +7,18 @@ interface CheckboxProps {
   checked: boolean;
   onPress: () => void;
   size?: number;
-  /** when true, uses the success color for the filled state */
-  successColor?: boolean;
   disabled?: boolean;
   accessibilityLabel?: string;
 }
 
 /**
  * Checkbox with a quick fill + tick. ~150ms ease-out, respects reduced motion.
+ * Uses the brand violet accent for the filled state on every platform.
  */
 export function Checkbox({
   checked,
   onPress,
   size = 22,
-  successColor,
   disabled,
   accessibilityLabel,
 }: CheckboxProps) {
@@ -35,7 +33,7 @@ export function Checkbox({
     }).start();
   }, [checked, anim]);
 
-  const fillColor = successColor ? colors.success : colors.accent;
+  const fillColor = colors.accent;
   const tickColor = colors.surface;
 
   return (

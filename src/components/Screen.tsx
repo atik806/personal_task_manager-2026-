@@ -54,7 +54,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   bottomPad: {
-    height: 96,
+    // Tall enough that the last task scrolls clear of the floating "+" FAB
+    // (which sits ~96+inset above the screen bottom) on mobile.
+    height: 130,
   },
   bottomPadWeb: {
     height: 96,
