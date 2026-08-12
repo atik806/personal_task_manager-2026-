@@ -1,16 +1,22 @@
 import React from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { Link, usePathname, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/use-theme";
-import { fonts } from "../lib/theme";
+import { fonts, radius } from "../lib/theme";
+import { tapHaptic } from "../lib/haptics";
 
-const TABS: { href: Href; label: string; icon: keyof typeof Feather.glyphMap }[] = [
-  { href: "/", label: "Today", icon: "sun" },
-  { href: "/upcoming", label: "Upcoming", icon: "calendar" },
-  { href: "/projects", label: "Projects", icon: "folder" },
-  { href: "/settings", label: "Settings", icon: "settings" },
+const TABS: {
+  href: Href;
+  label: string;
+  iconActive: keyof typeof Ionicons.glyphMap;
+  iconInactive: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { href: "/", label: "Today", iconActive: "sunny", iconInactive: "sunny-outline" },
+  { href: "/upcoming", label: "Upcoming", iconActive: "calendar", iconInactive: "calendar-outline" },
+  { href: "/projects", label: "Projects", iconActive: "folder", iconInactive: "folder-outline" },
+  { href: "/settings", label: "Settings", iconActive: "settings", iconInactive: "settings-outline" },
 ];
 
 export function BottomTabBar() {
@@ -29,7 +35,7 @@ export function BottomTabBar() {
         {
           backgroundColor: colors.surface,
           borderTopColor: colors.line,
-          paddingBottom: Math.max(insets.bottom, 8),
+          paddingBottom: Math.max(insets.bottom, 10),
         },
       ]}
     >
@@ -40,6 +46,7 @@ export function BottomTabBar() {
             <Pressable
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
+              onPress={tapHaptic}
               style={({ pressed }) => [
                 styles.tab,
                 pressed ? { opacity: 0.7 } : null,
@@ -51,9 +58,14 @@ export function BottomTabBar() {
                   active ? { backgroundColor: colors.accentSoft } : null,
                 ]}
               >
-                <Feather name={tab.icon} size={19} color={active ? colors.accent : colors.inkSecondary} />
+                <Ionicons
+                  name={active ? tab.iconActive : tab.iconInactive}
+                  size={24}
+                  color={active ? colors.accent : colors.inkSecondary}
+                />
               </View>
               <Text
+                numberOfLines={1}
                 style={{
                   fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
                   fontSize: 11,
@@ -81,12 +93,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 3,
-    minHeight: 52,
+    minHeight: 56,
   },
   pill: {
     minWidth: 48,
     height: 28,
-    borderRadius: 14,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 12,

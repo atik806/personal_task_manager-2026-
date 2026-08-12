@@ -4,7 +4,8 @@ import { Redirect, Stack } from "expo-router";
 import { useTheme } from "../../hooks/use-theme";
 import { useAuth } from "../../hooks/use-auth";
 import { BottomTabBar } from "../../components/BottomTabBar";
-import { Sidebar } from "../../components/Sidebar";
+import { TopNavbar } from "../../components/TopNavbar";
+import { NavMenu } from "../../components/NavMenu";
 import { QuickAddProvider } from "../../components/QuickAddProvider";
 import { ReminderSync } from "../../components/ReminderSync";
 
@@ -19,13 +20,12 @@ export default function AppLayout() {
     <View
       style={{
         flex: 1,
-        flexDirection: Platform.OS === "web" ? "row" : "column",
         backgroundColor: colors.canvas,
       }}
     >
       <ReminderSync />
       <QuickAddProvider>
-        <Sidebar />
+        {Platform.OS === "web" ? <TopNavbar /> : null}
         <View style={{ flex: 1 }}>
           <Stack
             screenOptions={{
@@ -34,7 +34,8 @@ export default function AppLayout() {
             }}
           />
         </View>
-        <BottomTabBar />
+        <NavMenu />
+        {Platform.OS === "web" ? null : <BottomTabBar />}
       </QuickAddProvider>
     </View>
   );
