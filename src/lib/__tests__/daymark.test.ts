@@ -20,6 +20,7 @@ import {
 import {
   currentStreak,
   completionsByWeekday,
+  dateTimeToDate,
   isBeforeToday,
   normalizeTime,
   parseTime,
@@ -256,6 +257,32 @@ describe("quick-add parsing", () => {
     expect(r.title).toBe("Standup");
   });
 
+  // --- M7 fix: quick-add with seconds ---
+
+  it('parses "Call dentist 17:30:00 #health" dropping the seconds', () => {
+    const r = parseQuickAdd("Call dentist 17:30:00 #health");
+    expect(r.title).toBe("Call dentist");
+    expect(r.dueTime).toBe("17:30");
+    expect(r.dueDate).toBeNull();
+    expect(r.tags).toEqual(["health"]);
+  });
+
+  it('parses "Standup 09:00:00" as 09:00', () => {
+    const r = parseQuickAdd("Standup 09:00:00");
+    expect(r.title).toBe("Standup");
+    expect(r.dueTime).toBe("09:00");
+    expect(r.dueDate).toBeNull();
+    expect(r.hasDueDate).toBe(false);
+  });
+
+  it('does NOT parse "Focus on 3 priorities" as a date or time', () => {
+    const r = parseQuickAdd("Focus on 3 priorities");
+    expect(r.title).toBe("Focus on 3 priorities");
+    expect(r.dueDate).toBeNull();
+    expect(r.dueTime).toBeNull();
+    expect(r.hasDueDate).toBe(false);
+  });
+
   // --- Fix #3, #4, #5: quick-add date parsing edge cases ---
 
   it('parses "next week" as next Monday', () => {
@@ -410,6 +437,22 @@ describe("parseTime", () => {
     expect(parseTime("")).toBeNull();
     expect(parseTime(null as unknown as string)).toBeNull();
   });
+
+  it("drops seconds from HH:MM:SS", () => {
+    expect(parseTime("17:30:59")).toBe("17:30");
+    expect(parseTime("09:00:00")).toBe("09:00");
+  });
+
+  it("rejects out-of-range hours/seconds in HH:MM:SS", () => {
+    expect(parseTime("25:00:00")).toBeNull(); // invalid hour
+    expect(parseTime("12:00:75")).toBeNull(); // invalid seconds
+  });
+
+  it("rejects a 24h time paired with an am/pm suffix (17:30:00 pm)", () => {
+    // The regex accepts "17:30:00 pm" but the 24h hour with a period is
+    // rejected — assert the real behavior.
+    expect(parseTime("17:30:00 pm")).toBeNull();
+  });
 });
 
 describe("normalizeTime (Postgres time boundary)", () => {
@@ -423,6 +466,17 @@ describe("normalizeTime (Postgres time boundary)", () => {
     expect(normalizeTime("17:30")).toBe("17:30");
     expect(normalizeTime(null)).toBeNull();
     expect(normalizeTime(undefined)).toBeNull();
+  });
+});
+
+describe("dateTimeToDate (seconds handling)", () => {
+  it("combines date + time into a local Date, dropping any seconds", () => {
+    const d = dateTimeToDate("2026-08-05", "17:30:00");
+    expect(d).toEqual(D(2026, 8, 5, 17, 30));
+  });
+
+  it("returns null when due_date is missing", () => {
+    expect(dateTimeToDate(null, "17:30")).toBeNull();
   });
 });
 
@@ -526,6 +580,29 @@ describe("taskInsertFromPatch", () => {
     expect(patch.status).toBe("todo");
     expect(patch.completed_at).toBeNull();
   });
+
+  // --- M-gap: status transition coverage ---
+
+  it("clears completed_at when moving a done task to in_progress", () => {
+    const task = sampleTask({ status: "done", completed_at: "2026-08-01T10:00:00Z" });
+    const patch = taskInsertFromPatch(task, { status: "in_progress" });
+    expect(patch.status).toBe("in_progress");
+    expect(patch.completed_at).toBeNull();
+  });
+
+  it("stamps completed_at when an in_progress task is completed", () => {
+    const task = sampleTask({ status: "in_progress", completed_at: null });
+    const patch = taskInsertFromPatch(task, { status: "done" });
+    expect(patch.status).toBe("done");
+    expect(patch.completed_at).not.toBeNull();
+  });
+
+  it("keeps the existing completed_at when status is left undefined on a done task", () => {
+    const task = sampleTask({ status: "done", completed_at: "2026-08-01T10:00:00Z" });
+    const patch = taskInsertFromPatch(task, { description: "edited" });
+    expect(patch.status).toBe("done");
+    expect(patch.completed_at).toBe("2026-08-01T10:00:00Z");
+  });
 });
 
 describe("buildRecurringTask", () => {
@@ -569,6 +646,26 @@ describe("buildRecurringTask", () => {
     const next = buildRecurringTask(task);
     expect(next!.due_date).toBe("2030-02-28");
     expect(next!.due_time).toBe("09:00");
+  });
+
+  it("anchors the recurrence on the due_date's local day in a negative-offset timezone", () => {
+    const prevTZ = process.env.TZ;
+    process.env.TZ = "America/New_York"; // UTC-5 in winter
+    try {
+      const task = sampleTask({
+        due_date: "2030-01-05",
+        due_time: "09:00",
+        recurrence_rule: "weekly",
+      });
+      const next = buildRecurringTask(task);
+      // "2030-01-05T00:00:00" parsed as UTC would land on Jan 4 locally;
+      // anchoring on the intended local day must yield Jan 12, not Jan 11.
+      expect(next).not.toBeNull();
+      expect(next!.due_date).toBe("2030-01-12");
+    } finally {
+      if (prevTZ === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTZ;
+    }
   });
 });
 
