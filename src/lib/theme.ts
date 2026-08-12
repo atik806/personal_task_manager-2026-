@@ -1,5 +1,6 @@
 /**
- * Design tokens — the "clarity under motion" palette.
+ * Design tokens — "clarity under motion": a near-black canvas, soft
+ * off-white ink, and one vibrant indigo/purple accent used sparingly.
  * Keep in sync with tailwind.config.js colors.
  */
 
@@ -50,67 +51,67 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  canvas: "#F4F5FB",
+  canvas: "#F6F6FB",
   surface: "#FFFFFF",
   surfaceElevated: "#FFFFFF",
-  fieldBg: "#F0F1F9",
-  ink: "#181A23",
-  inkSecondary: "#6B7080",
-  inkMuted: "#9BA0B0",
-  accent: "#4C5FD5",
-  accentDeep: "#6E4FEA",
-  accentSoft: "#E8EBFB",
+  fieldBg: "#EFF0F7",
+  ink: "#14151C",
+  inkSecondary: "#5F6478",
+  inkMuted: "#9AA0B4",
+  accent: "#6657F2",
+  accentDeep: "#7C6BFF",
+  accentSoft: "rgba(102,87,242,0.12)",
   danger: "#FF6B5B",
-  dangerSoft: "#FDEAE7",
+  dangerSoft: "rgba(255,107,91,0.12)",
   success: "#2FAE77",
-  successSoft: "#E4F4EC",
+  successSoft: "rgba(47,174,119,0.14)",
   warning: "#E8960C",
-  warningSoft: "#FBF0DC",
-  line: "#E4E6EF",
-  lineStrong: "#D4D7E6",
+  warningSoft: "rgba(232,150,12,0.14)",
+  line: "#E5E6F0",
+  lineStrong: "#D4D6E6",
   onAccent: "#FFFFFF",
-  scrim: "rgba(16,18,28,0.42)",
-  trackBg: "#ECEEF5",
+  scrim: "rgba(20,21,28,0.42)",
+  trackBg: "#EDEEF5",
   thumbBg: "#FFFFFF",
   chipBg: "#F0F1F7",
-  hover: "rgba(76,95,213,0.06)",
-  shadowColor: "#1A1E3C",
-  shadowOpacity: 0.08,
-  shadowRadius: 14,
-  buttonSecondaryBg: "#EDEFF6",
-  gradient: ["#4C5FD5", "#6E4FEA"],
+  hover: "rgba(102,87,242,0.08)",
+  shadowColor: "#1A1B2E",
+  shadowOpacity: 0.12,
+  shadowRadius: 16,
+  buttonSecondaryBg: "#ECEDF5",
+  gradient: ["#6657F2", "#7C6BFF"],
 };
 
 export const darkColors: ThemeColors = {
-  canvas: "#10121A",
-  surface: "#171A24",
-  surfaceElevated: "#1C202C",
-  fieldBg: "#0E1017",
-  ink: "#F1F2F6",
-  inkSecondary: "#A0A5B4",
-  inkMuted: "#5A5F6E",
-  accent: "#6E7EF0",
-  accentDeep: "#8B5CF6",
-  accentSoft: "#262C4D",
+  canvas: "#0B0B10",
+  surface: "#101016",
+  surfaceElevated: "#15151E",
+  fieldBg: "#0E0E14",
+  ink: "#F2F2F8",
+  inkSecondary: "#8B90A6",
+  inkMuted: "#565B70",
+  accent: "#7C6BFF",
+  accentDeep: "#8B7CFF",
+  accentSoft: "rgba(124,107,255,0.16)",
   danger: "#FF7A6B",
-  dangerSoft: "#3A2624",
+  dangerSoft: "rgba(255,122,107,0.12)",
   success: "#3ECB8E",
-  successSoft: "#1E332B",
+  successSoft: "rgba(62,203,142,0.14)",
   warning: "#F5B342",
-  warningSoft: "#3A3018",
-  line: "#262A35",
-  lineStrong: "#333949",
-  onAccent: "#0F1117",
-  scrim: "rgba(0,0,0,0.6)",
-  trackBg: "#0E1017",
-  thumbBg: "#1B1E28",
-  chipBg: "#232836",
-  hover: "rgba(110,126,240,0.10)",
+  warningSoft: "rgba(245,179,66,0.14)",
+  line: "#1B1B25",
+  lineStrong: "#272733",
+  onAccent: "#FFFFFF",
+  scrim: "rgba(0,0,0,0.62)",
+  trackBg: "#0E0E14",
+  thumbBg: "#1B1B25",
+  chipBg: "#17171F",
+  hover: "rgba(124,107,255,0.10)",
   shadowColor: "#000000",
-  shadowOpacity: 0.35,
-  shadowRadius: 18,
-  buttonSecondaryBg: "#2A2F3E",
-  gradient: ["#6E7EF0", "#8B5CF6"],
+  shadowOpacity: 0.4,
+  shadowRadius: 20,
+  buttonSecondaryBg: "#1A1A24",
+  gradient: ["#7C6BFF", "#8B7CFF"],
 };
 
 /** Font families as loaded by expo-font / Google Fonts packages. */
@@ -125,11 +126,22 @@ export const fonts = {
   monoMedium: "JetBrainsMono_500Medium",
 } as const;
 
+/**
+ * Radius language — one scale used across every component.
+ *   xs = 4  · tiny markers (badges, chips, dots)
+ *   sm = 8  · small controls (icon buttons, segmented thumb)
+ *   md = 12 · buttons, inputs, rows
+ *   lg = 14 · cards
+ *   xl = 20 · sheets, auth card
+ *   pill    · fully rounded (chips, avatars, swatches)
+ */
 export const radius = {
-  sm: 6,
-  md: 10,
+  xs: 4,
+  sm: 8,
+  md: 12,
   lg: 14,
   xl: 20,
+  pill: 999,
 } as const;
 
 export const spacing = {
@@ -179,4 +191,26 @@ export function elevation(c: ThemeColors, level: "sm" | "md" | "lg"): ElevationP
         elevation: 5,
       };
   }
+}
+
+/** Accent glow for active elements and primary CTAs — depth without clutter. */
+export function glow(
+  c: ThemeColors,
+  strength: "soft" | "strong" = "soft"
+): ElevationPreset {
+  return strength === "strong"
+    ? {
+        shadowColor: c.accent,
+        shadowOpacity: 0.5,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 8,
+      }
+    : {
+        shadowColor: c.accent,
+        shadowOpacity: 0.28,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 5 },
+        elevation: 4,
+      };
 }
