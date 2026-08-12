@@ -12,6 +12,7 @@ import { tapHaptic } from "../lib/haptics";
 import type { TaskInsert } from "../lib/types";
 import type { QuickAddResult } from "../lib/parse";
 import { QuickAddSheet } from "./QuickAddSheet";
+import { useSheetVisibility } from "./SheetVisibilityProvider";
 
 const QuickAddContext = createContext<{ open: () => void }>({ open: () => {} });
 
@@ -24,6 +25,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
+  const { isSheetOpen } = useSheetVisibility();
   const saveTask = useSaveTask(user?.id ?? "");
 
   const handleCreate = useCallback(
@@ -86,7 +88,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
     <QuickAddContext.Provider value={{ open: openQuickAdd }}>
       {children}
       <QuickAddSheet open={open} onClose={() => setOpen(false)} onCreate={handleCreate} />
-      {Platform.OS === "web" ? (
+      {!isSheetOpen && Platform.OS === "web" ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="New task"
@@ -111,7 +113,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
             <Text style={[styles.fabWebLabel, { color: colors.onAccent }]}>New task</Text>
           </LinearGradient>
         </Pressable>
-      ) : (
+      ) : !isSheetOpen ? (
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="New task"
@@ -134,7 +136,7 @@ export function QuickAddProvider({ children }: { children: React.ReactNode }) {
             <Ionicons name="add" size={24} color={colors.onAccent} />
           </LinearGradient>
         </Pressable>
-      )}
+      ) : null}
     </QuickAddContext.Provider>
   );
 }

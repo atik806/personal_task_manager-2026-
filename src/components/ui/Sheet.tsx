@@ -14,6 +14,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
 import { elevation, fonts, radius } from "../../lib/theme";
+import { useSheetVisibility } from "../SheetVisibilityProvider";
 
 const WEB_BREAKPOINT = 1024;
 
@@ -34,6 +35,7 @@ interface SheetProps {
  */
 export function Sheet({ open, onClose, title, subtitle, children, showCloseButton = true }: SheetProps) {
   const { colors } = useTheme();
+  const { reportSheetOpen } = useSheetVisibility();
   const isWide = Platform.OS === "web" && Dimensions.get("window").width >= WEB_BREAKPOINT;
 
   const [translate] = useState(() => new Animated.Value(isWide ? 420 : 600));
@@ -47,6 +49,17 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then((v) => (reducedMotion.current = v));
   }, []);
+
+  // Track visibility for SheetVisibilityProvider. The cleanup decrements on
+  // every close and on unmount, so a sheet that stays `open` but unmounts
+  // (TaskDetailSheet unmounts when its task becomes null) still releases the
+  // count.
+  useEffect(() => {
+    if (open) {
+      reportSheetOpen(true);
+    }
+    return () => reportSheetOpen(false);
+  }, [open, reportSheetOpen]);
 
   const snapBack = () => {
     Animated.spring(panY, { toValue: 0, useNativeDriver: true, bounciness: 4, speed: 20 }).start();

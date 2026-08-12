@@ -7,6 +7,7 @@ import { BottomTabBar } from "../../components/BottomTabBar";
 import { TopNavbar } from "../../components/TopNavbar";
 import { NavMenu } from "../../components/NavMenu";
 import { QuickAddProvider } from "../../components/QuickAddProvider";
+import { SheetVisibilityProvider } from "../../components/SheetVisibilityProvider";
 import { ReminderSync } from "../../components/ReminderSync";
 
 export default function AppLayout() {
@@ -24,19 +25,21 @@ export default function AppLayout() {
       }}
     >
       <ReminderSync />
-      <QuickAddProvider>
-        {Platform.OS === "web" ? <TopNavbar /> : null}
-        <View style={{ flex: 1 }}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.canvas },
-            }}
-          />
-        </View>
-        <NavMenu />
-        {Platform.OS === "web" ? null : <BottomTabBar />}
-      </QuickAddProvider>
+      <SheetVisibilityProvider>
+        <QuickAddProvider>
+          {Platform.OS === "web" ? <TopNavbar /> : null}
+          <View style={{ flex: 1 }}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: colors.canvas },
+              }}
+            />
+          </View>
+          <NavMenu />
+          {Platform.OS === "web" ? null : <BottomTabBar />}
+        </QuickAddProvider>
+      </SheetVisibilityProvider>
     </View>
   );
 }
