@@ -1,9 +1,10 @@
-import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Link, usePathname, type Href } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/use-theme";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
 import { fonts, radius } from "../lib/theme";
 import { tapHaptic } from "../lib/haptics";
 
@@ -25,6 +26,32 @@ const TABS: {
   { href: "/search", label: "Search", iconActive: "search", iconInactive: "search-outline" },
   { href: "/settings", label: "Settings", iconActive: "settings", iconInactive: "settings-outline" },
 ];
+
+/** Pops the pill (scale 0.92→1) when a tab becomes active instead of snapping. */
+function TabPill({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const reduced = useReducedMotion();
+  const [scale] = useState(() => new Animated.Value(1));
+
+  useEffect(() => {
+    if (active) {
+      if (reduced) {
+        scale.setValue(1);
+        return;
+      }
+      scale.setValue(0.92);
+      Animated.spring(scale, {
+        toValue: 1,
+        speed: 24,
+        bounciness: 5,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      scale.setValue(1);
+    }
+  }, [active, reduced, scale]);
+
+  return <Animated.View style={{ transform: [{ scale }] }}>{children}</Animated.View>;
+}
 
 export function BottomTabBar() {
   const { colors } = useTheme();
@@ -59,30 +86,34 @@ export function BottomTabBar() {
                 pressed ? { opacity: 0.7 } : null,
               ]}
             >
-              <View
-                style={[
-                  styles.pill,
-                  active ? { backgroundColor: colors.accentSoft } : null,
-                ]}
-              >
-                <Ionicons
-                  name={active ? tab.iconActive : tab.iconInactive}
-                  size={22}
-                  color={active ? colors.accent : colors.inkSecondary}
-                />
-                <Text
-                  numberOfLines={1}
+              <TabPill active={active}>
+                <View
                   style={[
-                    styles.label,
-                    {
-                      fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
-                      color: active ? colors.accent : colors.inkSecondary,
-                    },
+                    styles.pill,
+                    active ? { backgroundColor: colors.accentSoft } : null,
                   ]}
                 >
-                  {tab.label}
-                </Text>
-              </View>
+                  <Ionicons
+                    name={active ? tab.iconActive : tab.iconInactive}
+                    size={22}
+                    color={active ? colors.accent : colors.inkSecondary}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    style={[
+                      styles.label,
+                      {
+                        fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
+                        color: active ? colors.accent : colors.inkSecondary,
+                      },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </View>
+              </TabPill>
             </Pressable>
           </Link>
         );
@@ -111,7 +142,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 2,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 6,
     borderRadius: radius.lg,
   },
