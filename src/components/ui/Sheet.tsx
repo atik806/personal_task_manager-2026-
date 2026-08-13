@@ -41,6 +41,7 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
   const [translate] = useState(() => new Animated.Value(isWide ? 420 : 600));
   const [panY] = useState(() => new Animated.Value(0));
   const [backdrop] = useState(() => new Animated.Value(0));
+  const [displayed, setDisplayed] = useState(open);
   const reducedMotion = useRef(false);
   const startY = useRef(0);
   const lastMoveY = useRef(0);
@@ -50,16 +51,14 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
     AccessibilityInfo.isReduceMotionEnabled().then((v) => (reducedMotion.current = v));
   }, []);
 
-  // Track visibility for SheetVisibilityProvider. The cleanup decrements on
-  // every close and on unmount, so a sheet that stays `open` but unmounts
-  // (TaskDetailSheet unmounts when its task becomes null) still releases the
-  // count.
+  // Track visibility for SheetVisibilityProvider. Keyed off `displayed` (not
+  // `open`) so floating UI stays hidden while the sheet is animating out.
   useEffect(() => {
-    if (open) {
+    if (displayed) {
       reportSheetOpen(true);
     }
     return () => reportSheetOpen(false);
-  }, [open, reportSheetOpen]);
+  }, [displayed, reportSheetOpen]);
 
   const snapBack = () => {
     Animated.spring(panY, { toValue: 0, useNativeDriver: true, bounciness: 4, speed: 20 }).start();
@@ -67,29 +66,41 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
 
   const handleRelease = (dy: number, vy: number) => {
     if (dy > 100 || vy > 0.8) {
-      const duration = reducedMotion.current ? 0 : 200;
-      Animated.parallel([
-        Animated.timing(translate, { toValue: 600, duration, useNativeDriver: true }),
-        Animated.timing(panY, { toValue: 0, duration, useNativeDriver: true }),
-      ]).start(() => onClose());
+      onClose();
     } else {
       snapBack();
     }
   };
 
-  useEffect(() => {
-    if (open) {
-      const duration = reducedMotion.current ? 0 : 180;
-      Animated.timing(translate, { toValue: 0, duration, useNativeDriver: true }).start();
-      Animated.timing(backdrop, { toValue: 1, duration, useNativeDriver: true }).start();
-    } else {
-      translate.setValue(isWide ? 420 : 600);
-      panY.setValue(0);
-      backdrop.setValue(0);
-    }
-  }, [open, translate, panY, backdrop, isWide]);
+  // Show the sheet immediately when `open` flips true (render-phase state
+  // adjustment — the documented React pattern for syncing state to a prop).
+  if (open && !displayed) {
+    setDisplayed(true);
+  }
 
-  if (!open) return null;
+  // Slide in whenever the sheet becomes displayed.
+  useEffect(() => {
+    if (!displayed) return;
+    const duration = reducedMotion.current ? 0 : 180;
+    Animated.timing(translate, { toValue: 0, duration, useNativeDriver: true }).start();
+    Animated.timing(backdrop, { toValue: 1, duration, useNativeDriver: true }).start();
+  }, [displayed, translate, backdrop]);
+
+  // Animate out when `open` goes false. This covers every close path (backdrop
+  // tap, close button, drag-release, programmatic onClose) uniformly instead of
+  // unmounting instantly.
+  useEffect(() => {
+    if (!open && displayed) {
+      const duration = reducedMotion.current ? 0 : 180;
+      Animated.parallel([
+        Animated.timing(translate, { toValue: isWide ? 420 : 600, duration, useNativeDriver: true }),
+        Animated.timing(backdrop, { toValue: 0, duration, useNativeDriver: true }),
+        Animated.timing(panY, { toValue: 0, duration, useNativeDriver: true }),
+      ]).start(() => setDisplayed(false));
+    }
+  }, [open, displayed, isWide, translate, backdrop, panY]);
+
+  if (!displayed) return null;
 
   const panelWidth = Math.min(Dimensions.get("window").width * 0.92, 400);
 
@@ -105,7 +116,7 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
         style={StyleSheet.absoluteFill}
       />
       <Animated.View
-        pointerEvents="box-none"
+        pointerEvents="auto"
         style={[
           isWide ? styles.panelRight : styles.panelBottom,
           isWide ? { width: panelWidth } : null,
@@ -175,8 +186,11 @@ export function Sheet({ open, onClose, title, subtitle, children, showCloseButto
           {Platform.OS === "web" ? (
             children
           ) : (
+            // "padding" on iOS, "height" on Android. Android edge-to-edge
+            // (Expo SDK 53+) no longer resizes the window, so the KAV must
+            // actively shrink/pad to keep sheet content above the keyboard.
             <KeyboardAvoidingView
-              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
               style={styles.kav}
             >
               {children}
