@@ -34,6 +34,8 @@ interface TaskListProps {
   grouped?: boolean;
   /** When true, renders each task as a bordered card (violet time chip + checkbox). */
   card?: boolean;
+  /** When false, hides the per-task "Overdue" badge (e.g. inside an OVERDUE group). */
+  showOverdueLabel?: boolean;
   onPressTask: (task: TaskWithTags) => void;
   onToggleTask: (task: TaskWithTags) => void;
   onDeleteTask?: (task: TaskWithTags) => void;
@@ -46,6 +48,7 @@ export function TaskList({
   projectsById = {},
   grouped = true,
   card = false,
+  showOverdueLabel = true,
   onPressTask,
   onToggleTask,
   onDeleteTask,
@@ -83,22 +86,25 @@ export function TaskList({
     <View style={styles.container}>
       {sections.map(({ slot, tasks: sectionTasks }) => (
         <View key={slot} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionDot, { backgroundColor: slotColor(slot, colors) }]} />
-            <Text style={[styles.sectionTitle, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
-              {slotLabel(slot)}
-            </Text>
-            <View style={[styles.sectionCountChip, { backgroundColor: colors.accentSoft }]}>
-              <Text style={[styles.sectionCount, { color: colors.accent, fontFamily: fonts.monoMedium }]}>
-                {sectionTasks.length}
+          {grouped ? (
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionDot, { backgroundColor: slotColor(slot, colors) }]} />
+              <Text style={[styles.sectionTitle, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
+                {slotLabel(slot)}
               </Text>
+              <View style={[styles.sectionCountChip, { backgroundColor: colors.accentSoft }]}>
+                <Text style={[styles.sectionCount, { color: colors.accent, fontFamily: fonts.monoMedium }]}>
+                  {sectionTasks.length}
+                </Text>
+              </View>
             </View>
-          </View>
+          ) : null}
           {sectionTasks.map((task) => (
             <TaskItem
               key={task.id}
               task={task}
               card={card}
+              showOverdueLabel={showOverdueLabel}
               project={task.project_id ? projectsById[task.project_id] : undefined}
               onPress={() => onPressTask(task)}
               onToggle={() => onToggleTask(task)}

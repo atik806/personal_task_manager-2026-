@@ -65,6 +65,7 @@ export default function UpcomingScreen() {
   };
 
   const empty = tasksQ.data?.length === 0;
+  const noOpen = overdue.length + upcoming.length + noDate.length === 0;
 
   return (
     <Screen scroll>
@@ -105,7 +106,15 @@ export default function UpcomingScreen() {
         <EmptyState icon="calendar" title="No tasks yet" message="Add a task with a due date and it will show up here." />
       ) : (
         <View style={styles.sections}>
-          {filter === "all" || filter === "overdue" ? (
+          {filter === "all" && noOpen ? (
+            <EmptyState
+              icon="checkmark-circle"
+              title="All caught up"
+              message="No open tasks right now. Add one with a due date and it will show up here."
+            />
+          ) : null}
+
+          {!noOpen && (filter === "all" || filter === "overdue") ? (
             overdue.length > 0 ? (
               <View>
                 <Text style={[styles.dateHeader, { color: colors.danger, fontFamily: fonts.monoMedium }]}>
@@ -114,6 +123,7 @@ export default function UpcomingScreen() {
                 <TaskList
                   card
                   tasks={overdue}
+                  showOverdueLabel={false}
                   projectsById={projectsById}
                   onPressTask={setSelected}
                   onToggleTask={(t) => toggleTask.mutate(t)}
@@ -123,7 +133,7 @@ export default function UpcomingScreen() {
             ) : null
           ) : null}
 
-          {filter === "all" || filter === "upcoming" ? (
+          {!noOpen && (filter === "all" || filter === "upcoming") ? (
             upcomingByDate.map(([date, list]) => (
               <View key={date}>
                 <Text style={[styles.dateHeader, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
@@ -141,7 +151,7 @@ export default function UpcomingScreen() {
             ))
           ) : null}
 
-          {filter === "all" || filter === "nodate" ? (
+          {!noOpen && (filter === "all" || filter === "nodate") ? (
             noDate.length > 0 ? (
               <View>
                 <Text style={[styles.dateHeader, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
