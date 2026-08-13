@@ -76,6 +76,8 @@ export function SegmentedControl<T extends string>({
           >
             <Text
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
               style={{
                 fontFamily: active ? fonts.bodySemiBold : fonts.bodyMedium,
                 fontSize: 13,
@@ -114,7 +116,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 6,
     zIndex: 1,
   },
 });

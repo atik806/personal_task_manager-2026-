@@ -46,12 +46,6 @@ interface TaskDetailSheetProps {
   onToggle: () => void;
 }
 
-const DATE_PRESETS: { label: string; value: string }[] = [
-  { label: "Today", value: todayKey() },
-  { label: "Tomorrow", value: dayKey(1) },
-  { label: "+1wk", value: dayKey(7) },
-];
-
 const TIME_PRESETS = ["09:00", "12:00", "17:00"];
 
 export function TaskDetailSheet({
@@ -91,6 +85,13 @@ export function TaskDetailSheet({
   const selectedTags = useMemo(() => new Set(draft.tagIds), [draft.tagIds]);
   const done = draft.status === "done";
 
+  // Recompute each render so the presets stay correct across midnight.
+  const datePresets = [
+    { label: "Today", value: todayKey() },
+    { label: "Tomorrow", value: dayKey(1) },
+    { label: "+1wk", value: dayKey(7) },
+  ];
+
   if (!task) return null;
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
@@ -98,6 +99,14 @@ export function TaskDetailSheet({
 
   const toggleTag = (id: string) => {
     set("tagIds", draft.tagIds.includes(id) ? draft.tagIds.filter((t) => t !== id) : [...draft.tagIds, id]);
+  };
+
+  // Optimistically flip the draft's status so the Complete/Reopen button and
+  // Status control reflect the toggle immediately; the parent's onToggle
+  // mutates the underlying task.
+  const handleToggle = () => {
+    set("status", done ? "todo" : "done");
+    onToggle();
   };
 
   const handleSave = () => {
@@ -151,7 +160,6 @@ export function TaskDetailSheet({
           value={draft.title}
           onChangeText={(v) => set("title", v)}
           placeholder="What needs doing?"
-          autoFocus
         />
 
         <TextField
@@ -173,7 +181,7 @@ export function TaskDetailSheet({
             inputStyle={{ fontFamily: fonts.mono }}
           />
           <View style={styles.chipRow}>
-            {DATE_PRESETS.map((p) => (
+            {datePresets.map((p) => (
               <Chip
                 key={p.value}
                 label={p.label}
@@ -292,7 +300,7 @@ export function TaskDetailSheet({
             label={done ? "Reopen" : "Complete"}
             variant="secondary"
             icon={<Ionicons name={done ? "refresh" : "checkmark"} size={17} color={colors.success} />}
-            onPress={onToggle}
+            onPress={handleToggle}
           />
           <Button
             label="Delete"

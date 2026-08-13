@@ -1,7 +1,8 @@
-import React from "react";
-import { Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Animated, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../hooks/use-theme";
+import { useReducedMotion } from "../../hooks/use-reduced-motion";
 import { fonts, glow, radius } from "../../lib/theme";
 
 interface EmptyStateProps {
@@ -13,8 +14,34 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
+  const [pop] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (reduced) {
+      pop.setValue(1);
+      return;
+    }
+    Animated.spring(pop, {
+      toValue: 1,
+      speed: 16,
+      bounciness: 7,
+      useNativeDriver: true,
+    }).start();
+  }, [reduced, pop]);
+
   return (
-    <View style={styles.wrap}>
+    <Animated.View
+      style={[
+        styles.wrap,
+        {
+          opacity: pop,
+          transform: [
+            { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
+          ],
+        },
+      ]}
+    >
       <View style={styles.badgeWrap}>
         <View style={[styles.badge, { backgroundColor: colors.accentSoft }, glow(colors, "soft")]}>
           <Ionicons name={icon} size={30} color={colors.accent} />
@@ -24,7 +51,7 @@ export function EmptyState({ icon, title, message, action }: EmptyStateProps) {
       <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
       {message ? <Text style={[styles.message, { color: colors.inkSecondary }]}>{message}</Text> : null}
       {action ? <View style={styles.action}>{action}</View> : null}
-    </View>
+    </Animated.View>
   );
 }
 
