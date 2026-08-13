@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useTheme } from "../hooks/use-theme";
@@ -46,13 +46,15 @@ export function TaskItem({
   const done = task.status === "done";
   const overdue = isTaskOverdue(task);
   const [anim] = useState(() => new Animated.Value(done ? 1 : 0));
+  const [pressScale] = useState(() => new Animated.Value(1));
   const prevStatus = useRef(task.status);
 
   useEffect(() => {
     if (prevStatus.current !== "done" && task.status === "done") {
       Animated.timing(anim, {
         toValue: 1,
-        duration: 180,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start();
     } else if (task.status !== "done") {
@@ -60,6 +62,15 @@ export function TaskItem({
     }
     prevStatus.current = task.status;
   }, [task.status, anim]);
+
+  const animatePress = (to: number) => {
+    Animated.spring(pressScale, {
+      toValue: to,
+      speed: 40,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const handleToggle = () => {
     if (!done) completeHaptic();
@@ -77,11 +88,14 @@ export function TaskItem({
         opacity: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] }),
         transform: [
           { translateX: anim.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) },
+          { scale: pressScale },
         ],
       }}
     >
       <Pressable
         onPress={onPress}
+        onPressIn={() => animatePress(0.985)}
+        onPressOut={() => animatePress(1)}
         accessibilityRole="button"
         accessibilityLabel={`${task.title}${task.due_time ? ` at ${formatTimeHHMM(task.due_time)}` : ""}`}
         style={({ pressed, hovered }) => [
