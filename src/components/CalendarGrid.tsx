@@ -1,6 +1,7 @@
-import React from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "../hooks/use-theme";
+import { useReducedMotion } from "../hooks/use-reduced-motion";
 import { fonts, radius } from "../lib/theme";
 import { getMonthGrid, getWeekDates, toISODate, today } from "../lib/dates";
 import type { TaskWithTags } from "../lib/types";
@@ -97,9 +98,28 @@ function DayCell({
 
 export function CalendarGrid({ mode, anchor, tasksByDate, onPressTask }: CalendarGridProps) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
   const todayKey = toISODate(today());
   const monthGrid = getMonthGrid(anchor);
   const monthKey = toISODate(anchor).slice(0, 7);
+
+  const [fade] = useState(() => new Animated.Value(1));
+
+  // Gently fade + slide the grid in when the user navigates months/weeks or
+  // switches modes, so the date change reads as a transition, not a blink.
+  useEffect(() => {
+    if (reduced) {
+      fade.setValue(1);
+      return;
+    }
+    fade.setValue(0);
+    Animated.spring(fade, {
+      toValue: 1,
+      speed: 32,
+      bounciness: 2,
+      useNativeDriver: true,
+    }).start();
+  }, [mode, anchor, reduced, fade]);
 
   const renderCell = (d: Date, inMonth: boolean) => {
     const key = toISODate(d);
@@ -116,7 +136,14 @@ export function CalendarGrid({ mode, anchor, tasksByDate, onPressTask }: Calenda
   };
 
   return (
-    <View>
+    <Animated.View
+      style={{
+        opacity: fade,
+        transform: [
+          { translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) },
+        ],
+      }}
+    >
       <View style={styles.weekHeader}>
         {WEEKDAY_LABELS.map((label) => (
           <Text key={label} style={[styles.weekdayLabel, { color: colors.inkSecondary, fontFamily: fonts.monoMedium }]}>
@@ -135,7 +162,7 @@ export function CalendarGrid({ mode, anchor, tasksByDate, onPressTask }: Calenda
           </View>
         ))
       )}
-    </View>
+    </Animated.View>
   );
 }
 
