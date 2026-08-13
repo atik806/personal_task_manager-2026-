@@ -64,7 +64,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
         content
       ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.kav}
         >
           <ScrollView
