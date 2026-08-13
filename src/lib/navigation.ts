@@ -18,4 +18,5 @@ export const NAV_ITEMS: NavDestination[] = [
   { href: "/projects", label: "Projects", icon: "folder-outline" },
   { href: "/tags", label: "Tags", icon: "pricetag-outline" },
   { href: "/search", label: "Search", icon: "search-outline" },
+  { href: "/settings", label: "Settings", icon: "settings-outline" },
 ];
